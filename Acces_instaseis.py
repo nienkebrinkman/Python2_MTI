@@ -5,7 +5,6 @@ import os.path
 from obspy.geodetics import kilometer2degrees
 from obspy.geodetics.base import gps2dist_azimuth
 
-
 ## All different classes:
 from Metropolis_Hasting import MH_algorithm
 from Inversion_problems import Inversion_problem
@@ -13,16 +12,18 @@ from Forward_problem import Forward_problem
 from Seismogram import Seismogram
 from Green_functions import Green_functions
 from Source_code import Source_code
+from Plots import Plots
+from MCMC_pymc import MCMC_algorithm
 from Neighborhood_algorithm import Neighborhood_algorithm
 from Misfit import Misfit
 
 ## Velocity model:
-VELOC = 'http://instaseis.ethz.ch/marssynthetics/C80VL-BFT13-1s'
+VELOC = 'http://instaseis.ethz.ch/marssynthetics/C30VL-AKSNL-1s'
 VELOC_taup = 'iasp91'
 
 # Safe parameters:
 directory = '/home/nienke/Documents/Applied_geophysics/Thesis/anaconda/testdata'
-filename = 'test_5.yaml'
+filename = '100000_trial.yaml'
 filepath = os.path.join(directory, filename)
 
 ## Parameters:
@@ -119,22 +120,36 @@ sampler['azimuth']['range_min'] = 2
 sampler['azimuth']['range_max'] = 22
 sampler['azimuth']['step'] = 22
 sampler['time_range'] = PARAMETERS['origin_time'].hour - 1  # The time range can only vary may be two hours!!
-sampler['sample_number'] = 100
+sampler['sample_number'] = 5
 sampler['var_est'] = 0.05
 
 
 def main():
+
+    ## Plot marginal 2d Histogram of Data from Metropolis hasting
+    # plot=Plots()
+    # plot.make_PDF(sampler)
+
     ## Obtain database to create both Seismograms and Greens_functions:
+
     db = instaseis.open_db(VELOC)
 
     ## Make seismogram:
+
     seis = Seismogram(PARAMETERS, db)
     u, traces, source = seis.get()  # u = stacked seismograms , traces = 3 component seismogram separated
 
+    ## MCMC algorithm
+
+    MCMC = MCMC_algorithm(sampler,u)
+    MCMC.Instaseis(PARAMETERS, db)
+
+
     ## Metropolis Hasting Algorithm
+
     MH = MH_algorithm(PARAMETERS, sampler, db, u)
+    # Parallel = MH.do_parallel()
     accept_model = MH.do()
-    MH.make_PDF()
 
     ## Get Green functions:
     Green = Green_functions(PARAMETERS, db)
@@ -160,6 +175,10 @@ def main():
     moment_d = inverse.Solve_damping()
     moment_ds = inverse.Solve_damping_smoothing()
     moment_svd = inverse.Solve_SVD()
+
+    # Plot observed vs synthetic seismogram:
+    plot=Plots()
+    plot.Compare_seismograms(data,u)
 
 
 if __name__ == '__main__':

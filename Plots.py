@@ -1,12 +1,17 @@
 import matplotlib.pyplot as plt
 import pylab
 import numpy as np
+import os
+import yaml
+import itertools
+
+
 from obspy.imaging.beachball import beachball
 
 class Plots:
     def __init__(self):
         params = {'legend.fontsize': 'x-large',
-                  'figure.figsize': (10, 10),
+                  'figure.figsize': (15, 15),
                   'axes.labelsize': 25,
                   'axes.titlesize': 'x-large',
                   'xtick.labelsize': 25,
@@ -46,3 +51,38 @@ class Plots:
         plt.ylabel('Instaseis data displacement [m]')
         plt.grid()
         plt.show()
+
+    def make_PDF(self, sampler):
+        self.sampler = sampler
+        if os.path.isfile(self.sampler['filepath']) == True:
+            with open(self.sampler['filepath'], 'r') as stream:
+                data = yaml.load(stream)
+                stream.close()
+            for i in itertools.combinations(data,2):
+                self.marginal_2D(data[i[0]],i[0],data[i[1]],i[1],amount_bins=20)
+        else:
+            print("The file does not exist yet [FIRST RUN THE MH_ALOGRITHM!]")
+
+
+    def marginal_2D(self,data_x,name_x,data_y,name_y,amount_bins):
+        plt.hist2d(data_x, data_y, bins=amount_bins, normed=True, cmap='binary')
+        # plt.axis('equal')
+        # plt.xlim([-20,40])
+        # plt.ylim([10,70])
+        plt.xlabel('%s' % name_x)
+        plt.ylabel('%s' % name_y)
+        plt.title('2D posterior marginal', fontsize = 25)
+        cb = plt.colorbar()
+        cb.set_label('Probability')
+        plt.savefig('%s/marginal_2D_%s_%s.pdf'% (self.sampler['directory'],name_x,name_y))
+        # plt.show()
+        plt.close()
+
+    def marginal_1D(self, data, name, amount_bins):
+
+        q=np.histogram(data, bins=amount_bins)
+        plt.hist(data, bins=amount_bins)
+        plt.xlabel('%s' % name)
+        plt.ylabel('Frequency')
+        plt.show()
+

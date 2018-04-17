@@ -2,6 +2,8 @@ import numpy as np
 import obspy
 import os
 import yaml
+import mpi4py as MPI
+import multiprocessing as mp
 
 from Inversion_problems import Inversion_problem
 from Misfit import Misfit
@@ -81,7 +83,7 @@ class MH_algorithm:
 
     def do(self):
         accept = {'epi': np.array([]), 'azimuth': np.array([]), 'depth': np.array([]),
-                  'time': [], 'misfit': np.array([])}
+                  'time': np.array([]), 'misfit': np.array([])}
         ## Starting parameters and create A START MODEL (MODEL_OLD):
         epi, azimuth, depth, time = self.model_samples()
         d_syn_old = self.G_function(epi, depth, azimuth, time)
@@ -90,7 +92,7 @@ class MH_algorithm:
         accept['epi'] = np.append(accept['epi'], epi)
         accept['azimuth'] = np.append(accept['azimuth'], azimuth)
         accept['depth'] = np.append(accept['depth'], depth)
-        accept['time'].append(time)
+        accept['time']=np.append(accept['time'],time.timestamp)
         accept['misfit'] = np.append(accept['misfit'], Xi_old)
 
         for i in range(self.sampler['sample_number']):
@@ -103,14 +105,14 @@ class MH_algorithm:
                 accept['epi'] = np.append(accept['epi'], epi)
                 accept['azimuth'] = np.append(accept['azimuth'], azimuth)
                 accept['depth'] = np.append(accept['depth'], depth)
-                accept['time'].append(time)
+                accept['time']=np.append(accept['time'],time.timestamp)
                 accept['misfit'] = np.append(accept['misfit'], Xi_new)
                 Xi_old = Xi_new
             else:
                 accept['epi'] = np.append(accept['epi'], accept['epi'][i])
                 accept['azimuth'] = np.append(accept['azimuth'], accept['azimuth'][i])
                 accept['depth'] = np.append(accept['depth'], accept['depth'][i])
-                accept['time'].append(accept['time'][i])
+                accept['time'] = np.append(accept['time'],accept['time'][i])
                 accept['misfit'] = np.append(accept['misfit'], Xi_old)
                 continue
         filepath = self.sampler['filepath']
@@ -128,26 +130,64 @@ class MH_algorithm:
             yaml_file.close()
             return accept
 
+#-----------------------------------------------------------------------------------------------------------------------
+# Run parallel [NOT FINISHED YET]
 
-    def make_PDF(self):
-        a=1
-        if os.path.isfile(self.sampler['filepath']) == True:
-            with open(self.par['filepath'], 'r') as stream:
-                data = yaml.load(stream)
-                stream.close()
-            # q=np.histogram(data['azimuth'], bins=100)
-            # plt.hist(data['azimuth'], bins=100)
-            # plt.xlabel('azimuth')
-            # plt.ylabel('Frequency')
-            # plt.show()
-            # total_time=data['time']['hour'] *3600 + data['time']['min'] * 60 + data['time']['sec']
-            # H=np.histogram2d(data['depth'],total_time, bins= (100,100))
+    def do_sampler(self):
+        accept = {'epi': np.array([]), 'azimuth': np.array([]), 'depth': np.array([]),
+                  'time': np.array([]), 'misfit': np.array([])}
+        ## Starting parameters and create A START MODEL (MODEL_OLD):
+        epi, azimuth, depth, time = self.model_samples()
+        d_syn_old = self.G_function(epi, depth, azimuth, time)
+        misfit = Misfit()
+        Xi_old = misfit.get_xi(self.d_obs, d_syn_old, self.sampler['var_est'])
+        accept['epi'] = np.append(accept['epi'], epi)
+        accept['azimuth'] = np.append(accept['azimuth'], azimuth)
+        accept['depth'] = np.append(accept['depth'], depth)
+        accept['time'] = np.append(accept['time'], time.timestamp)
+        accept['misfit'] = np.append(accept['misfit'], Xi_old)
+
+        for i in range(self.sampler['sample_number']):
+            epi, azimuth, depth, time = self.model_samples()
+            d_syn = self.G_function(epi, depth, azimuth, time)
+            misfit = Misfit()
+            Xi_new = misfit.get_xi(self.d_obs, d_syn, self.sampler['var_est'])
+            random = np.random.random_sample((1,))
+            if Xi_new < Xi_old or (Xi_old / Xi_new) > random:
+                accept['epi'] = np.append(accept['epi'], epi)
+                accept['azimuth'] = np.append(accept['azimuth'], azimuth)
+                accept['depth'] = np.append(accept['depth'], depth)
+                accept['time'] = np.append(accept['time'], time.timestamp)
+                accept['misfit'] = np.append(accept['misfit'], Xi_new)
+                Xi_old = Xi_new
+            else:
+                accept['epi'] = np.append(accept['epi'], accept['epi'][i])
+                accept['azimuth'] = np.append(accept['azimuth'], accept['azimuth'][i])
+                accept['depth'] = np.append(accept['depth'], accept['depth'][i])
+                accept['time'] = np.append(accept['time'], accept['time'][i])
+                accept['misfit'] = np.append(accept['misfit'], Xi_old)
+                continue
+        self.output.put((accept))
+
+    def do_parallel(self):
+        self.output = mp.Queue()
+
+        # Setup a list of processes that we want to run
+        processes = [mp.Process(target=self.do_sampler) for x in range(4)]
+
+        # Run processes
+        for p in processes:
+            p.start()
+
+        # Exit the completed processes
+        for p in processes:
+            p.join()
+
+        # Get process results from the output queue
+        results = [self.output.get() for p in processes]
+
+        print(results)
 
 
-            a=1
-            # NOT FINISHED YET
-        else:
-            print("The filename does not exist yet, the MH algorithm will now first run")
-            self.do(self.sampler['sample_number'])
-            print("The file is now available, so run make_PDF again")
+
 
