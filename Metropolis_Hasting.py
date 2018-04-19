@@ -3,10 +3,12 @@ import obspy
 import os
 import yaml
 import mpi4py as MPI
-import multiprocessing as mp
+# import multiprocessing
+from mpi4py import MPI
 
 from Inversion_problems import Inversion_problem
 from Misfit import Misfit
+
 
 class MH_algorithm:
     def __init__(self, PARAMETERS, sampler, db, data):
@@ -21,10 +23,10 @@ class MH_algorithm:
         depth_sample = np.random.uniform(self.sampler['depth']['range_min'], self.sampler['depth']['range_max'])
 
         # Time sampler:
-        year = self.par['origin_time'].year # Constant
-        month = self.par['origin_time'].month # Constant
-        day = self.par['origin_time'].day # Constant
-        hour = int(np.random.uniform(self.sampler['time_range'], self.par['origin_time'].hour+1))
+        year = self.par['origin_time'].year  # Constant
+        month = self.par['origin_time'].month  # Constant
+        day = self.par['origin_time'].day  # Constant
+        hour = int(np.random.uniform(self.sampler['time_range'], self.par['origin_time'].hour + 1))
         min = int(np.random.uniform(0, 60))
         sec = int(np.random.uniform(1, 60))
         time_sample = obspy.UTCDateTime(year, month, day, hour, min, sec)
@@ -76,118 +78,95 @@ class MH_algorithm:
         G = self.generate_G(epi, depth, azimuth, t)
         inv = Inversion_problem(self.d_obs, G, self.par)
         moment = inv.Solve_damping_smoothing()
-        ## -- choose a range for moment with the help of the Resolution Matrix --
-        ## NOT FINISHED YET!!!
+        # TODO - choose a range for moment with the help of the Resolution Matrix
         d_syn = np.matmul(G, moment)
-        return d_syn
+        return d_syn, moment
+
+# ---------------------------------------------------------------------------------------------------------------------#
+#                                                 NOT parallel                                                         #
+# ---------------------------------------------------------------------------------------------------------------------#
+
 
     def do(self):
-        accept = {'epi': np.array([]), 'azimuth': np.array([]), 'depth': np.array([]),
-                  'time': np.array([]), 'misfit': np.array([])}
-        ## Starting parameters and create A START MODEL (MODEL_OLD):
-        epi, azimuth, depth, time = self.model_samples()
-        d_syn_old = self.G_function(epi, depth, azimuth, time)
-        misfit = Misfit()
-        Xi_old = misfit.get_xi(self.d_obs, d_syn_old, self.sampler['var_est'])
-        accept['epi'] = np.append(accept['epi'], epi)
-        accept['azimuth'] = np.append(accept['azimuth'], azimuth)
-        accept['depth'] = np.append(accept['depth'], depth)
-        accept['time']=np.append(accept['time'],time.timestamp)
-        accept['misfit'] = np.append(accept['misfit'], Xi_old)
-
-        for i in range(self.sampler['sample_number']):
-            epi, azimuth, depth, time = self.model_samples()
-            d_syn = self.G_function(epi, depth, azimuth, time)
+        with open(self.sampler['filepath'], 'w') as yaml_file:
+            ## Starting parameters and create A START MODEL (MODEL_OLD):
+            epi_old, azimuth_old, depth_old, time_old = self.model_samples()
+            d_syn_old, moment_old = self.G_function(epi_old, depth_old, azimuth_old, time_old)
             misfit = Misfit()
-            Xi_new = misfit.get_xi(self.d_obs, d_syn, self.sampler['var_est'])
-            random = np.random.random_sample((1,))
-            if Xi_new < Xi_old or (Xi_old / Xi_new) > random:
-                accept['epi'] = np.append(accept['epi'], epi)
-                accept['azimuth'] = np.append(accept['azimuth'], azimuth)
-                accept['depth'] = np.append(accept['depth'], depth)
-                accept['time']=np.append(accept['time'],time.timestamp)
-                accept['misfit'] = np.append(accept['misfit'], Xi_new)
-                Xi_old = Xi_new
-            else:
-                accept['epi'] = np.append(accept['epi'], accept['epi'][i])
-                accept['azimuth'] = np.append(accept['azimuth'], accept['azimuth'][i])
-                accept['depth'] = np.append(accept['depth'], accept['depth'][i])
-                accept['time'] = np.append(accept['time'],accept['time'][i])
-                accept['misfit'] = np.append(accept['misfit'], Xi_old)
-                continue
-        filepath = self.sampler['filepath']
-        if os.path.isfile(filepath) == True:
-            filename_new = 'NEW'
-            print('The filename already exists: it is now saved as: %s ' %filename_new)
-            path = os.path.join(self.par['directory'], filename_new)
-            with open(path, 'w') as yaml_file:
-                yaml.dump(accept, yaml_file, default_flow_style=False)
-            yaml_file.close()
-            return accept
-        else:
-            with open(filepath, 'w') as yaml_file:
-                yaml.dump(accept, yaml_file, default_flow_style=False)
-            yaml_file.close()
-            return accept
+            Xi_old = misfit.get_xi(self.d_obs, d_syn_old, self.sampler['var_est'])
+            yaml_file.write("%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4r,%.4f,%.4f\n\r" % (
+                epi_old, azimuth_old, depth_old, time_old.timestamp, Xi_old, moment_old[0], moment_old[1],
+                moment_old[2], moment_old[3], moment_old[4]))
 
-#-----------------------------------------------------------------------------------------------------------------------
-# Run parallel [NOT FINISHED YET]
+            for i in range(self.sampler['sample_number']):
+                epi, azimuth, depth, time = self.model_samples()
+                d_syn, moment = self.G_function(epi, depth, azimuth, time)
+                misfit = Misfit()
+                Xi_new = misfit.get_xi(self.d_obs, d_syn, self.sampler['var_est'])
+                random = np.random.random_sample((1,))
+                if Xi_new < Xi_old or (Xi_old / Xi_new) > random:
+                    yaml_file.write("%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4r,%.4f,%.4f\n\r" % (
+                        epi, azimuth, depth, time.timestamp, Xi_new, moment[0], moment[1], moment[2], moment[3],
+                        moment[4]))
+                    Xi_old = Xi_new
+                    epi_old = epi
+                    azimuth_old = azimuth
+                    depth_old = depth
+                    time_old = time
+                    moment_old = moment
+                else:
+                    yaml_file.write("%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4r,%.4f,%.4f\n\r" % (
+                        epi_old, azimuth_old, depth_old, time_old.timestamp, Xi_old, moment_old[0], moment_old[1],
+                        moment_old[2], moment_old[3], moment_old[4]))
+                    continue
+        yaml_file.close()
 
-    def do_sampler(self):
-        accept = {'epi': np.array([]), 'azimuth': np.array([]), 'depth': np.array([]),
-                  'time': np.array([]), 'misfit': np.array([])}
-        ## Starting parameters and create A START MODEL (MODEL_OLD):
-        epi, azimuth, depth, time = self.model_samples()
-        d_syn_old = self.G_function(epi, depth, azimuth, time)
-        misfit = Misfit()
-        Xi_old = misfit.get_xi(self.d_obs, d_syn_old, self.sampler['var_est'])
-        accept['epi'] = np.append(accept['epi'], epi)
-        accept['azimuth'] = np.append(accept['azimuth'], azimuth)
-        accept['depth'] = np.append(accept['depth'], depth)
-        accept['time'] = np.append(accept['time'], time.timestamp)
-        accept['misfit'] = np.append(accept['misfit'], Xi_old)
-
-        for i in range(self.sampler['sample_number']):
-            epi, azimuth, depth, time = self.model_samples()
-            d_syn = self.G_function(epi, depth, azimuth, time)
-            misfit = Misfit()
-            Xi_new = misfit.get_xi(self.d_obs, d_syn, self.sampler['var_est'])
-            random = np.random.random_sample((1,))
-            if Xi_new < Xi_old or (Xi_old / Xi_new) > random:
-                accept['epi'] = np.append(accept['epi'], epi)
-                accept['azimuth'] = np.append(accept['azimuth'], azimuth)
-                accept['depth'] = np.append(accept['depth'], depth)
-                accept['time'] = np.append(accept['time'], time.timestamp)
-                accept['misfit'] = np.append(accept['misfit'], Xi_new)
-                Xi_old = Xi_new
-            else:
-                accept['epi'] = np.append(accept['epi'], accept['epi'][i])
-                accept['azimuth'] = np.append(accept['azimuth'], accept['azimuth'][i])
-                accept['depth'] = np.append(accept['depth'], accept['depth'][i])
-                accept['time'] = np.append(accept['time'], accept['time'][i])
-                accept['misfit'] = np.append(accept['misfit'], Xi_old)
-                continue
-        self.output.put((accept))
-
+# ---------------------------------------------------------------------------------------------------------------------#
+#                                                 RUN parallel                                                         #
+# ---------------------------------------------------------------------------------------------------------------------#
     def do_parallel(self):
-        self.output = mp.Queue()
+        comm = MPI.COMM_WORLD
+        rank = comm.Get_rank()
+        size = comm.Get_size()
 
-        # Setup a list of processes that we want to run
-        processes = [mp.Process(target=self.do_sampler) for x in range(4)]
+        print("Rank", rank, "Size", size)
+        self.processing(rank, size)
 
-        # Run processes
-        for p in processes:
-            p.start()
+    def processing(self, rank, size):
+        dir_proc = self.sampler['directory'] + '/proc'
+        if not os.path.exists(dir_proc):
+            os.makedirs(dir_proc)
+        filepath_proc = dir_proc + '/file_proc_%i.txt' % rank
 
-        # Exit the completed processes
-        for p in processes:
-            p.join()
+        with open(filepath_proc, 'w') as yaml_file:
+            ## Starting parameters and create A START MODEL (MODEL_OLD):
+            epi_old, azimuth_old, depth_old, time_old = self.model_samples()
+            d_syn_old, moment_old = self.G_function(epi_old, depth_old, azimuth_old, time_old)
+            misfit = Misfit()
+            Xi_old = misfit.get_xi(self.d_obs, d_syn_old, self.sampler['var_est'])
+            yaml_file.write("%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4r,%.4f,%.4f\n\r" % (
+                epi_old, azimuth_old, depth_old, time_old.timestamp, Xi_old, moment_old[0], moment_old[1],
+                moment_old[2], moment_old[3], moment_old[4]))
 
-        # Get process results from the output queue
-        results = [self.output.get() for p in processes]
-
-        print(results)
-
-
-
-
+            for i in range(self.sampler['sample_number']):
+                epi, azimuth, depth, time = self.model_samples()
+                d_syn, moment = self.G_function(epi, depth, azimuth, time)
+                misfit = Misfit()
+                Xi_new = misfit.get_xi(self.d_obs, d_syn, self.sampler['var_est'])
+                random = np.random.random_sample((1,))
+                if Xi_new < Xi_old or (Xi_old / Xi_new) > random:
+                    yaml_file.write("%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4r,%.4f,%.4f\n\r" % (
+                        epi, azimuth, depth, time.timestamp, Xi_new, moment[0], moment[1], moment[2], moment[3],
+                        moment[4]))
+                    Xi_old = Xi_new
+                    epi_old = epi
+                    azimuth_old = azimuth
+                    depth_old = depth
+                    time_old = time
+                    moment_old = moment
+                else:
+                    yaml_file.write("%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4r,%.4f,%.4f\n\r" % (
+                        epi_old, azimuth_old, depth_old, time_old.timestamp, Xi_old, moment_old[0], moment_old[1],
+                        moment_old[2], moment_old[3], moment_old[4]))
+                    continue
+        yaml_file.close()
