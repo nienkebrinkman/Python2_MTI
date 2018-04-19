@@ -11,19 +11,20 @@ from Inversion_problems import Inversion_problem
 from Forward_problem import Forward_problem
 from Seismogram import Seismogram
 from Green_functions import Green_functions
-from Source_code import Source_code
+# from Source_code import Source_code
 from Plots import Plots
 from MCMC_pymc import MCMC_algorithm
 from Neighborhood_algorithm import Neighborhood_algorithm
 from Misfit import Misfit
+from Post_Processing import Post_processing
 
 ## Velocity model:
-VELOC = 'http://instaseis.ethz.ch/marssynthetics/C30VL-AKSNL-1s'
+VELOC = 'http://instaseis.ethz.ch/marssynthetics/C30VH-BFT13-1s'
 VELOC_taup = 'iasp91'
 
 # Safe parameters:
 directory = '/home/nienke/Documents/Applied_geophysics/Thesis/anaconda/testdata'
-filename = '100000_trial.yaml'
+filename = 'test_euler.txt'
 filepath = os.path.join(directory, filename)
 
 ## Parameters:
@@ -120,14 +121,22 @@ sampler['azimuth']['range_min'] = 2
 sampler['azimuth']['range_max'] = 22
 sampler['azimuth']['step'] = 22
 sampler['time_range'] = PARAMETERS['origin_time'].hour - 1  # The time range can only vary may be two hours!!
-sampler['sample_number'] = 5
+sampler['sample_number'] = 1000
 sampler['var_est'] = 0.05
 
 
 def main():
 
+    ## Post - Processing [processing the results from inversion]
+    result = Post_processing(sampler)
+    save_path , savename = result.combine_parallel()
+    result.get_pdf(save_path,savename,sampler['directory'])
+
     ## Plot marginal 2d Histogram of Data from Metropolis hasting
+
     # plot=Plots()
+    # plot.make_PDF(sampler)
+
     # plot.make_PDF(sampler)
 
     ## Obtain database to create both Seismograms and Greens_functions:
@@ -141,44 +150,44 @@ def main():
 
     ## MCMC algorithm
 
-    MCMC = MCMC_algorithm(sampler,u)
-    MCMC.Instaseis(PARAMETERS, db)
+    # MCMC = MCMC_algorithm(sampler,u)
+    # MCMC.Instaseis(PARAMETERS, db)
 
 
     ## Metropolis Hasting Algorithm
 
     MH = MH_algorithm(PARAMETERS, sampler, db, u)
-    # Parallel = MH.do_parallel()
-    accept_model = MH.do()
+    Parallel = MH.do_parallel()
+    # accept_model = MH.processing(sampler['filepath'])
 
     ## Get Green functions:
-    Green = Green_functions(PARAMETERS, db)
-    G = Green.get()
+    # Green = Green_functions(PARAMETERS, db)
+    # G = Green.get()
 
     ## Obtain Seismogram and Green function with certain window
-    source_inv = Source_code(PARAMETERS, db)
-    G_window, u_window = source_inv.get_windows(traces, G)
+    # source_inv = Source_code(PARAMETERS, db)
+    # G_window, u_window = source_inv.get_windows(traces, G)
 
     ## Solve forward model:
-    moment_init = np.array([source.m_tt, source.m_pp, -source.m_tp, source.m_rt,
-                            -source.m_rp])
-    print('Initial moment: \n%s' % moment_init)
-    forward = Forward_problem(PARAMETERS, G, moment_init)
-    data = forward.Solve_forward()
-
-    Resolution_matrix = np.matmul(np.linalg.pinv(G), G)
-    sampler['moment_range'] = Resolution_matrix
-
-
-    ## Solve inversion method:
-    inverse = Inversion_problem(u, G, PARAMETERS)
-    moment_d = inverse.Solve_damping()
-    moment_ds = inverse.Solve_damping_smoothing()
-    moment_svd = inverse.Solve_SVD()
-
-    # Plot observed vs synthetic seismogram:
-    plot=Plots()
-    plot.Compare_seismograms(data,u)
+    # moment_init = np.array([source.m_tt, source.m_pp, -source.m_tp, source.m_rt,
+    #                         -source.m_rp])
+    # print('Initial moment: \n%s' % moment_init)
+    # forward = Forward_problem(PARAMETERS, G, moment_init)
+    # data = forward.Solve_forward()
+    #
+    # Resolution_matrix = np.matmul(np.linalg.pinv(G), G)
+    # sampler['moment_range'] = Resolution_matrix
+    #
+    #
+    # ## Solve inversion method:
+    # inverse = Inversion_problem(u, G, PARAMETERS)
+    # moment_d = inverse.Solve_damping()
+    # moment_ds = inverse.Solve_damping_smoothing()
+    # moment_svd = inverse.Solve_SVD()
+    #
+    # # Plot observed vs synthetic seismogram:
+    # plot=Plots()
+    # plot.Compare_seismograms(data,u)
 
 
 if __name__ == '__main__':

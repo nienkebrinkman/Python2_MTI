@@ -82,13 +82,8 @@ class MH_algorithm:
         d_syn = np.matmul(G, moment)
         return d_syn, moment
 
-# ---------------------------------------------------------------------------------------------------------------------#
-#                                                 NOT parallel                                                         #
-# ---------------------------------------------------------------------------------------------------------------------#
-
-
-    def do(self):
-        with open(self.sampler['filepath'], 'w') as yaml_file:
+    def processing(self, filepath):
+        with open(filepath, 'w') as yaml_file:
             ## Starting parameters and create A START MODEL (MODEL_OLD):
             epi_old, azimuth_old, depth_old, time_old = self.model_samples()
             d_syn_old, moment_old = self.G_function(epi_old, depth_old, azimuth_old, time_old)
@@ -130,43 +125,10 @@ class MH_algorithm:
         size = comm.Get_size()
 
         print("Rank", rank, "Size", size)
-        self.processing(rank, size)
-
-    def processing(self, rank, size):
         dir_proc = self.sampler['directory'] + '/proc'
         if not os.path.exists(dir_proc):
             os.makedirs(dir_proc)
         filepath_proc = dir_proc + '/file_proc_%i.txt' % rank
+        self.processing(filepath_proc)
 
-        with open(filepath_proc, 'w') as yaml_file:
-            ## Starting parameters and create A START MODEL (MODEL_OLD):
-            epi_old, azimuth_old, depth_old, time_old = self.model_samples()
-            d_syn_old, moment_old = self.G_function(epi_old, depth_old, azimuth_old, time_old)
-            misfit = Misfit()
-            Xi_old = misfit.get_xi(self.d_obs, d_syn_old, self.sampler['var_est'])
-            yaml_file.write("%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4r,%.4f,%.4f\n\r" % (
-                epi_old, azimuth_old, depth_old, time_old.timestamp, Xi_old, moment_old[0], moment_old[1],
-                moment_old[2], moment_old[3], moment_old[4]))
 
-            for i in range(self.sampler['sample_number']):
-                epi, azimuth, depth, time = self.model_samples()
-                d_syn, moment = self.G_function(epi, depth, azimuth, time)
-                misfit = Misfit()
-                Xi_new = misfit.get_xi(self.d_obs, d_syn, self.sampler['var_est'])
-                random = np.random.random_sample((1,))
-                if Xi_new < Xi_old or (Xi_old / Xi_new) > random:
-                    yaml_file.write("%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4r,%.4f,%.4f\n\r" % (
-                        epi, azimuth, depth, time.timestamp, Xi_new, moment[0], moment[1], moment[2], moment[3],
-                        moment[4]))
-                    Xi_old = Xi_new
-                    epi_old = epi
-                    azimuth_old = azimuth
-                    depth_old = depth
-                    time_old = time
-                    moment_old = moment
-                else:
-                    yaml_file.write("%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4r,%.4f,%.4f\n\r" % (
-                        epi_old, azimuth_old, depth_old, time_old.timestamp, Xi_old, moment_old[0], moment_old[1],
-                        moment_old[2], moment_old[3], moment_old[4]))
-                    continue
-        yaml_file.close()

@@ -1,4 +1,5 @@
 from obspy.taup import TauPyModel
+import numpy as np
 class Source_code:
     def __init__(self, PARAMETERS, db):
         self.par = PARAMETERS
