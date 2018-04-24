@@ -1,9 +1,7 @@
 import numpy as np
 import obspy
 import os
-import yaml
 import mpi4py as MPI
-# import multiprocessing
 from mpi4py import MPI
 
 from Inversion_problems import Inversion_problem
@@ -19,21 +17,26 @@ class MH_algorithm:
 
     def model_samples(self):
         epi_sample = np.random.uniform(self.sampler['epi']['range_min'], self.sampler['epi']['range_max'])
-        azimuth_sample = np.random.uniform(self.sampler['azimuth']['range_min'], self.sampler['azimuth']['range_max'])
-        depth_sample = np.random.uniform(self.sampler['depth']['range_min'], self.sampler['depth']['range_max'])
+        depth_sample = np.around(np.random.uniform(self.sampler['depth']['range_min'], self.sampler['depth']['range_max']), decimals=1)
 
         # Time sampler:
         year = self.par['origin_time'].year  # Constant
         month = self.par['origin_time'].month  # Constant
         day = self.par['origin_time'].day  # Constant
-        hour = int(np.random.uniform(self.sampler['time_range'], self.par['origin_time'].hour + 1))
-        min = int(np.random.uniform(0, 60))
-        sec = int(np.random.uniform(1, 60))
-        time_sample = obspy.UTCDateTime(year, month, day, hour, min, sec)
+        hour = self.par['origin_time'].hour # Constant
+        sec = int(np.random.uniform(self.sampler['time_range'], self.par['origin_time'].second +1))
+        if sec < int(0):
+            sec_new = 59 +sec
+            min = self.par['origin_time'].minute - 1 # Constant
+        else:
+            sec_new = sec
+            min = min = self.par['origin_time'].minute
+        time_sample = obspy.UTCDateTime(year, month, day, hour, min, sec_new)
 
-        return epi_sample, azimuth_sample, depth_sample, time_sample
+        return epi_sample, depth_sample, time_sample
 
-    def generate_G(self, epi, depth, azimuth, t):
+    def generate_G(self, epi, depth, t):
+        azimuth = self.par['az']
         gf = self.db.get_greens_function(epicentral_distance_in_degree=epi, source_depth_in_m=depth, origin_time=t,
                                          kind=self.par['kind'], kernelwidth=self.par['kernelwidth'],
                                          definition=self.par['definition'])
@@ -74,8 +77,8 @@ class MH_algorithm:
         G[G_r:G_t, 4] = -tds * np.cos(2 * np.deg2rad(azimuth))
         return G
 
-    def G_function(self, epi, depth, azimuth, t):
-        G = self.generate_G(epi, depth, azimuth, t)
+    def G_function(self, epi, depth, t):
+        G = self.generate_G(epi, depth, t)
         inv = Inversion_problem(self.d_obs, G, self.par)
         moment = inv.Solve_damping_smoothing()
         # TODO - choose a range for moment with the help of the Resolution Matrix
@@ -85,33 +88,32 @@ class MH_algorithm:
     def processing(self, filepath):
         with open(filepath, 'w') as yaml_file:
             ## Starting parameters and create A START MODEL (MODEL_OLD):
-            epi_old, azimuth_old, depth_old, time_old = self.model_samples()
-            d_syn_old, moment_old = self.G_function(epi_old, depth_old, azimuth_old, time_old)
+            epi_old, depth_old, time_old = self.model_samples()
+            d_syn_old, moment_old = self.G_function(epi_old, depth_old, time_old)
             misfit = Misfit()
             Xi_old = misfit.get_xi(self.d_obs, d_syn_old, self.sampler['var_est'])
-            yaml_file.write("%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4r,%.4f,%.4f\n\r" % (
-                epi_old, azimuth_old, depth_old, time_old.timestamp, Xi_old, moment_old[0], moment_old[1],
+            yaml_file.write("%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4r,%.4f,%.4f\n\r" % (
+                epi_old,depth_old, time_old.timestamp, Xi_old, moment_old[0], moment_old[1],
                 moment_old[2], moment_old[3], moment_old[4]))
 
             for i in range(self.sampler['sample_number']):
-                epi, azimuth, depth, time = self.model_samples()
-                d_syn, moment = self.G_function(epi, depth, azimuth, time)
+                epi, depth, time = self.model_samples()
+                d_syn, moment = self.G_function(epi, depth, time)
                 misfit = Misfit()
                 Xi_new = misfit.get_xi(self.d_obs, d_syn, self.sampler['var_est'])
                 random = np.random.random_sample((1,))
                 if Xi_new < Xi_old or (Xi_old / Xi_new) > random:
-                    yaml_file.write("%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4r,%.4f,%.4f\n\r" % (
-                        epi, azimuth, depth, time.timestamp, Xi_new, moment[0], moment[1], moment[2], moment[3],
+                    yaml_file.write("%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4r,%.4f,%.4f\n\r" % (
+                        epi, depth, time.timestamp, Xi_new, moment[0], moment[1], moment[2], moment[3],
                         moment[4]))
                     Xi_old = Xi_new
                     epi_old = epi
-                    azimuth_old = azimuth
                     depth_old = depth
                     time_old = time
                     moment_old = moment
                 else:
-                    yaml_file.write("%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4r,%.4f,%.4f\n\r" % (
-                        epi_old, azimuth_old, depth_old, time_old.timestamp, Xi_old, moment_old[0], moment_old[1],
+                    yaml_file.write("%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4r,%.4f,%.4f\n\r" % (
+                        epi_old,  depth_old, time_old.timestamp, Xi_old, moment_old[0], moment_old[1],
                         moment_old[2], moment_old[3], moment_old[4]))
                     continue
         yaml_file.close()
@@ -129,6 +131,14 @@ class MH_algorithm:
         if not os.path.exists(dir_proc):
             os.makedirs(dir_proc)
         filepath_proc = dir_proc + '/file_proc_%i.txt' % rank
-        self.processing(filepath_proc)
+        try:
+            self.processing(filepath_proc)
+        except TypeError:
+            print ("TypeError in rank: %i" %rank)
+            self.processing(filepath_proc)
+
+        comm.bcast()  # All the processor wait until they are all at this point
+        if rank == 0:
+            print ("The .txt files are saved in: %s" % dir_proc)
 
 
