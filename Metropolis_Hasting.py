@@ -6,6 +6,7 @@ from mpi4py import MPI
 
 from Inversion_problems import Inversion_problem
 from Misfit import Misfit
+from Plots import Plots
 
 
 class MH_algorithm:
@@ -79,13 +80,18 @@ class MH_algorithm:
 
     def G_function(self, epi, depth, t):
         G = self.generate_G(epi, depth, t)
-        inv = Inversion_problem(self.d_obs, G, self.par)
-        moment = inv.Solve_damping_smoothing()
+        moment = self.inv.Solve_damping_smoothing(self.d_obs,G)
         # TODO - choose a range for moment with the help of the Resolution Matrix
         d_syn = np.matmul(G, moment)
         return d_syn, moment
 
     def processing(self, filepath):
+        self.inv = Inversion_problem( self.par)
+
+        # Plot the Prior information ranges:
+        # TODO - Use distribution plots of seaborn to plot the range of your sample distribution
+        # plot = Plots()
+
         with open(filepath, 'w') as yaml_file:
             ## Starting parameters and create A START MODEL (MODEL_OLD):
             epi_old, depth_old, time_old = self.model_samples()
