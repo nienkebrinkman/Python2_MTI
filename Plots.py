@@ -31,7 +31,11 @@ class Plots:
         plt.show()
 
     def Beachball(self, moment):
-        beachball(moment, size=200, linewidth=2, facecolor='b')
+        try:
+            beachball(moment, size=200, linewidth=2, facecolor='b')
+            plt.show()
+        except TypeError:
+            print ("TypeError")
 
     def Compare_seismograms(self, forward_data, instaseis_data):
         fig = plt.figure(figsize=(20, 10))
@@ -72,12 +76,20 @@ class Plots:
         plt.close()
 
 
-    def marginal_1D(self, data, name, amount_bins):
+    def marginal_1D(self, data, name, amount_bins,directory,filename):
         q = np.histogram(data, bins=amount_bins)
         plt.hist(data, bins=amount_bins)
         plt.xlabel('%s' % name)
         plt.ylabel('Frequency')
-        plt.show()
+        dir_proc = directory +'/1D_margi_Plots/%s' % filename
+        if not os.path.exists(dir_proc):
+            os.makedirs(dir_proc)
+        filepath_proc= dir_proc + '/1D_%s.pdf' % (name)
+        plt.savefig(filepath_proc)
+        # plt.show()
+        plt.close()
+
+
 
 
 
