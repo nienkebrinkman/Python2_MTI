@@ -6,6 +6,8 @@ import os
 import numpy as np
 import itertools
 import glob
+import pandas as pd
+
 
 
 class Post_processing:
@@ -78,10 +80,22 @@ class Post_processing:
             for i in moment_data:
                 plot.Beachball(i)
 
+    def Seaborn_plots(self,filepath, savename, directory):
+        dir_seaborn = directory + '/Seaborn'
+        if not os.path.exists(dir_seaborn):
+            os.makedirs(dir_seaborn)
 
 
+        data = np.loadtxt(filepath, delimiter=',')
+        df = pd.DataFrame(data,
+                          columns=["Epicentral_distance", "Depth", "Time", "Misfit", "Mxx", "Myy", "Mxy", "Mxz", "Myz"])
+        df_select = df[['Epicentral_distance', 'Depth', 'Time', 'Misfit']]
 
+        plot=Plots()
 
-        # TODO - Plot the results of Moment Tensor
+        ## Kernel Density approximation
+        plot.Kernel_density(data=df,data_x="Epicentral_distance",data_y="Depth",directory=dir_seaborn,savename=savename)
 
+        ## Pair Grid approximation
+        plot.Pair_Grid(data=df_select,directory=directory,savename=savename)
 

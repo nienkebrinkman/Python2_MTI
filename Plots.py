@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import pylab
 import numpy as np
 import os
+import seaborn as sns
 import yaml
 import itertools
 
@@ -87,6 +88,24 @@ class Plots:
         filepath_proc= dir_proc + '/1D_%s.pdf' % (name)
         plt.savefig(filepath_proc)
         # plt.show()
+        plt.close()
+
+    def Kernel_density(self,data,data_x,data_y,directory,savename):
+        dir= directory +'/Kernel_density/%s' % savename
+        if not os.path.exists(dir):
+            os.makedirs(dir)
+        sns.jointplot(x=data_x, y=data_y, data=data, kind="kde")
+        plt.savefig(dir)
+        plt.close()
+
+    def Pair_Grid(self,data,directory,savename):
+        dir= directory +'/Pair_grid/%s' % savename
+        if not os.path.exists(dir):
+            os.makedirs(dir)
+        g = sns.PairGrid(data=data)
+        g.map_diag(sns.kdeplot)
+        g.map_offdiag(sns.kdeplot, cmap="Blues_d", n_levels=6)
+        plt.savefig(dir)
         plt.close()
 
 
