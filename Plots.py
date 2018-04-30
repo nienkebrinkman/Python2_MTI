@@ -56,6 +56,7 @@ class Plots:
         plt.ylabel('Instaseis data displacement [m]')
         plt.grid()
         plt.show()
+
     def marginal_2D(self, data_x, name_x, data_y, name_y, amount_bins, directory, filename):
         plt.hist2d(data_x, data_y, bins=amount_bins, normed=True, cmap='binary')
         # plt.hist2d(data_x, data_y, range=[[np.min(data_x), np.max(data_x)], [30.80, 30.85]], bins=amount_bins, normed=True,
@@ -91,22 +92,49 @@ class Plots:
         plt.close()
 
     def Kernel_density(self,data,data_x,data_y,directory,savename):
-        dir= directory +'/Kernel_density/%s' % savename
+        dir= directory +'/Kernel_density'
         if not os.path.exists(dir):
             os.makedirs(dir)
+        dir_path = dir + '/%s.pdf' %savename
         sns.jointplot(x=data_x, y=data_y, data=data, kind="kde")
-        plt.savefig(dir)
+        plt.savefig(dir_path)
         plt.close()
 
     def Pair_Grid(self,data,directory,savename):
-        dir= directory +'/Pair_grid/%s' % savename
+        dir= directory +'/Pair_grid'
         if not os.path.exists(dir):
             os.makedirs(dir)
+        dir_path=dir+'/%s.pdf'%savename
         g = sns.PairGrid(data=data)
         g.map_diag(sns.kdeplot)
         g.map_offdiag(sns.kdeplot, cmap="Blues_d", n_levels=6)
-        plt.savefig(dir)
+        plt.savefig(dir_path)
         plt.close()
+
+    def sampler(self,filepath,directory,savename):
+
+        dir= directory +'/sampler'
+        if not os.path.exists(dir):
+            os.makedirs(dir)
+        dir_path=dir+'/%s.pdf'%savename
+
+        burnin=980
+        data = np.transpose(np.loadtxt(filepath, delimiter=','))
+        data_dict = {'Epicentral_distance': data[0],
+                     'Depth': data[1],
+                     'Time': data[2]}
+
+        sns.set_style("darkgrid")
+        plt.scatter(data_dict['Epicentral_distance'][burnin], data_dict['Depth'][burnin], marker='^',
+                    label="Start_point")
+        plt.plot(data_dict['Epicentral_distance'][burnin:], data_dict['Depth'][burnin:], linestyle=':',
+                 label="sample_lag")
+        plt.scatter(data_dict['Epicentral_distance'][burnin + 1:], data_dict['Depth'][burnin + 1:], label="Sample")
+        plt.xlabel("Epicentral Distance")
+        plt.ylabel("Depth")
+        plt.legend()
+        plt.savefig(dir_path)
+
 
 
 
