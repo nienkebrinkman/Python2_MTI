@@ -7,6 +7,7 @@ import numpy as np
 import itertools
 import glob
 import pandas as pd
+import instaseis
 
 
 
@@ -23,10 +24,14 @@ class Post_processing:
             return save_path, filename
         else:
             with open(save_path, 'w') as outfile:
-                for fname in filenames:
+                for i,fname in enumerate(filenames):
                     with open(fname) as infile:
-                        for line in infile:
-                            outfile.write(line)
+                        if i == 0:
+                            for line in infile:
+                                outfile.write(line)
+                        else:
+                            for line in itertools.islice(infile,35,None):
+                                outfile.write(line)
             return save_path, filename
 
 
@@ -43,8 +48,8 @@ class Post_processing:
             # data[6] - Moment_xy           [Nm]
             # data[7] - Moment_xz           [Nm]
             # data[8] - Moment_yz           [Nm]
-
-            data = np.transpose(np.loadtxt(filepath, delimiter=','))
+            parameters=open(filepath,"r").readlines()[:35]
+            data = np.transpose(np.loadtxt(filepath, delimiter=',',skiprows=70))
             data_dict = {'Epicentral_distance' : data[0],
                          'Depth' : data[1],
                          'Time' : data[2],
@@ -94,8 +99,9 @@ class Post_processing:
         plot=Plots()
 
         ## Kernel Density approximation
-        plot.Kernel_density(data=df,data_x="Epicentral_distance",data_y="Depth",directory=dir_seaborn,savename=savename)
+        # plot.Kernel_density(data=df,data_x="Epicentral_distance",data_y="Depth",directory=dir_seaborn,savename=savename)
 
         ## Pair Grid approximation
         plot.Pair_Grid(data=df_select,directory=directory,savename=savename)
+
 
