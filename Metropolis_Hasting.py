@@ -129,8 +129,6 @@ class MH_algorithm:
         self.inv = Inversion_problem( self.par)
         with open(savepath, 'w') as yaml_file:
             self.write(yaml_file) # Writes all the parameters used for this inversion
-            # -TODO write out the parameters used in this inversion (e.g. Velocity model)
-
             ## Starting parameters and create A START MODEL (MODEL_OLD):
             epi_old, depth_old, time_old = self.model_samples()
             d_syn_old, moment_old = self.G_function(epi_old, depth_old, time_old)
