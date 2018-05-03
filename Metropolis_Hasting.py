@@ -7,15 +7,17 @@ import matplotlib.pyplot as plt
 
 from Inversion_problems import Inversion_problem
 from Misfit import Misfit
+from Source_code import Source_code
 from Plots import Plots
 
 
 class MH_algorithm:
-    def __init__(self, PARAMETERS, sampler, db, data):
+    def __init__(self, PARAMETERS, sampler, db, data,traces):
         self.db = db
         self.par = PARAMETERS
         self.sampler = sampler
         self.d_obs = data
+        self.traces = traces
 
     def model_samples(self):
         epi_sample = np.random.uniform(self.sampler['epi']['range_min'], self.sampler['epi']['range_max'])
@@ -86,6 +88,13 @@ class MH_algorithm:
         d_syn = np.matmul(G, moment)
         return d_syn, moment
 
+    def Window_function(self, epi, depth, t):
+        G = self.generate_G(epi, depth, t)
+        G_window, d_obs_window = self.window.get_windows(self.traces,G)
+        moment_window = self.inv.Solve_damping_smoothing(d_obs_window,G_window)
+        d_syn_window = np.matmul(G_window, moment_window)
+        return d_syn_window, moment_window
+
     def write(self,txt_file):
         txt_file.write("%s\n\r" % self.par['VELOC']) # Velocity model used
         # txt_file.write("%.4f\n\r" % self.par['MO'])  #
@@ -124,14 +133,18 @@ class MH_algorithm:
         txt_file.write("%i\n\r" % self.sampler['depth']['range_min'])  #
         txt_file.write("%i\n\r" % self.sampler['depth']['step'])  #
 
-
-    def processing(self, savepath):
+    def processing(self, savepath, window):
         self.inv = Inversion_problem( self.par)
+        if window == True:
+            self.window = Source_code(self.par,self.db)
         with open(savepath, 'w') as yaml_file:
             self.write(yaml_file) # Writes all the parameters used for this inversion
             ## Starting parameters and create A START MODEL (MODEL_OLD):
             epi_old, depth_old, time_old = self.model_samples()
-            d_syn_old, moment_old = self.G_function(epi_old, depth_old, time_old)
+            if window == True:
+                d_syn_old, moment_old = self.Window_function(epi_old, depth_old, time_old)
+            else:
+                d_syn_old, moment_old = self.G_function(epi_old, depth_old, time_old)
             plt.plot(d_syn_old, alpha=0.2)
 
             misfit = Misfit()
@@ -142,7 +155,10 @@ class MH_algorithm:
 
             for i in range(self.sampler['sample_number']):
                 epi, depth, time = self.model_samples()
-                d_syn, moment = self.G_function(epi, depth, time)
+                if window == True:
+                    d_syn, moment = self.Window_function(epi, depth, time)
+                else:
+                    d_syn, moment = self.G_function(epi, depth, time)
                 misfit = Misfit()
                 Xi_new = misfit.get_xi(self.d_obs, d_syn, self.sampler['var_est'])
                 random = np.random.random_sample((1,))
@@ -166,7 +182,20 @@ class MH_algorithm:
             plt.ylabel("Displacement")
             plt.legend()
             plt.savefig(savepath.strip('.txt')+'_%i.pdf'%(self.sampler['sample_number']))
+        yaml_file.close()
 
+    def test_samples(self):
+        # This function just saves the different samples, important to check how we sample!
+        self.inv = Inversion_problem(self.par)
+        filepath = self.sampler['directory'] + '/sampler_test.txt'
+        with open(filepath, 'w') as yaml_file:
+            ## Starting parameters and create A START MODEL (MODEL_OLD):
+            epi_old, depth_old, time_old = self.model_samples()
+            yaml_file.write("%.4f,%.4f,%.4f\n\r" % (epi_old, depth_old, time_old.timestamp))
+
+            for i in range(1000):
+                epi, depth, time = self.model_samples()
+                yaml_file.write("%.4f,%.4f,%.4f\n\r" % (epi, depth, time.timestamp))
         yaml_file.close()
 
 # ---------------------------------------------------------------------------------------------------------------------#
@@ -183,27 +212,14 @@ class MH_algorithm:
             os.makedirs(dir_proc)
         filepath_proc = dir_proc + '/file_proc_%i.txt' % rank
         try:
-            self.processing(filepath_proc)
+            self.processing(filepath_proc, window=True)
         except TypeError:
             print ("TypeError in rank: %i" %rank)
-            self.processing(filepath_proc)
+            self.processing(filepath_proc,window=True)
 
         comm.bcast()  # All the processor wait until they are all at this point
         if rank == 0:
             print ("The .txt files are saved in: %s" % dir_proc)
 
-    def test_samples(self):
-        # This function just saves the different samples, important to check how we sample!
-        self.inv = Inversion_problem(self.par)
-        filepath= self.sampler['directory'] + '/sampler_test.txt'
-        with open(filepath, 'w') as yaml_file:
-            ## Starting parameters and create A START MODEL (MODEL_OLD):
-            epi_old, depth_old, time_old = self.model_samples()
-            yaml_file.write("%.4f,%.4f,%.4f\n\r"% (epi_old, depth_old, time_old.timestamp))
-
-            for i in range(1000):
-                epi, depth, time = self.model_samples()
-                yaml_file.write("%.4f,%.4f,%.4f\n\r" % (epi, depth, time.timestamp))
-        yaml_file.close()
 
 

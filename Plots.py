@@ -10,7 +10,7 @@ import itertools
 from obspy.imaging.beachball import beachball
 
 class Plots:
-    def __init__(self):
+    def Log_G(self, G):
         params = {'legend.fontsize': 'x-large',
                   'figure.figsize': (15, 15),
                   'axes.labelsize': 25,
@@ -18,8 +18,6 @@ class Plots:
                   'xtick.labelsize': 25,
                   'ytick.labelsize': 25}
         pylab.rcParams.update(params)
-
-    def Log_G(self, G):
         plt.imshow(np.log(G))
         # plt.title('Matrix : G')
         plt.gca().set_aspect(1.0 / 10000.0)
@@ -27,11 +25,25 @@ class Plots:
         plt.show()
 
     def G_transpose_G(self, G):
+        params = {'legend.fontsize': 'x-large',
+                  'figure.figsize': (15, 15),
+                  'axes.labelsize': 25,
+                  'axes.titlesize': 'x-large',
+                  'xtick.labelsize': 25,
+                  'ytick.labelsize': 25}
+        pylab.rcParams.update(params)
         plt.imshow(np.matmul(G.T, G))
         # plt.title('G.T G')
         plt.show()
 
     def Beachball(self, moment):
+        params = {'legend.fontsize': 'x-large',
+                  'figure.figsize': (15, 15),
+                  'axes.labelsize': 25,
+                  'axes.titlesize': 'x-large',
+                  'xtick.labelsize': 25,
+                  'ytick.labelsize': 25}
+        pylab.rcParams.update(params)
         try:
             beachball(moment, size=200, linewidth=2, facecolor='b')
             plt.show()
@@ -39,6 +51,13 @@ class Plots:
             print ("TypeError")
 
     def Compare_seismograms(self, forward_data, instaseis_data):
+        params = {'legend.fontsize': 'x-large',
+                  'figure.figsize': (15, 15),
+                  'axes.labelsize': 25,
+                  'axes.titlesize': 'x-large',
+                  'xtick.labelsize': 25,
+                  'ytick.labelsize': 25}
+        pylab.rcParams.update(params)
         fig = plt.figure(figsize=(20, 10))
         ax1 = fig.add_subplot(121)
         ax1.plot(forward_data)
@@ -58,6 +77,13 @@ class Plots:
         plt.show()
 
     def marginal_2D(self, data_x, name_x, data_y, name_y, amount_bins, directory, filename):
+        params = {'legend.fontsize': 'x-large',
+                  'figure.figsize': (15, 15),
+                  'axes.labelsize': 25,
+                  'axes.titlesize': 'x-large',
+                  'xtick.labelsize': 25,
+                  'ytick.labelsize': 25}
+        pylab.rcParams.update(params)
         plt.hist2d(data_x, data_y, bins=amount_bins, normed=True, cmap='binary')
         # plt.hist2d(data_x, data_y, range=[[np.min(data_x), np.max(data_x)], [30.80, 30.85]], bins=amount_bins, normed=True,
         #            cmap='binary')
@@ -79,6 +105,13 @@ class Plots:
 
 
     def marginal_1D(self, data, name, amount_bins,directory,filename):
+        params = {'legend.fontsize': 'x-large',
+                  'figure.figsize': (15, 15),
+                  'axes.labelsize': 25,
+                  'axes.titlesize': 'x-large',
+                  'xtick.labelsize': 25,
+                  'ytick.labelsize': 25}
+        pylab.rcParams.update(params)
         q = np.histogram(data, bins=amount_bins)
         plt.hist(data, bins=amount_bins)
         plt.xlabel('%s' % name)
@@ -91,11 +124,12 @@ class Plots:
         # plt.show()
         plt.close()
 
-    def Kernel_density(self,data,data_x,data_y,directory,savename):
+    def Kernel_density(self,data,data_x,data_y,parameters,directory,savename):
         dir= directory +'/Kernel_density'
         if not os.path.exists(dir):
             os.makedirs(dir)
-        dir_path = dir + '/%s.pdf' %savename
+        # dir_path = dir + '/%s.pdf' %savename
+        dir_path = dir + '/Real_%s_%.2f_Real_%s_%.2f.pdf' % (data_x,parameters['%s'%data_x],data_y,parameters['%s'%data_y])
         sns.jointplot(x=data_x, y=data_y, data=data, kind="kde")
         plt.savefig(dir_path)
         plt.close()
@@ -112,6 +146,13 @@ class Plots:
         plt.close()
 
     def sampler(self,filepath,directory,savename):
+        params = {'legend.fontsize': 'x-large',
+                  'figure.figsize': (15, 15),
+                  'axes.labelsize': 25,
+                  'axes.titlesize': 'x-large',
+                  'xtick.labelsize': 25,
+                  'ytick.labelsize': 25}
+        pylab.rcParams.update(params)
 
         dir= directory +'/sampler'
         if not os.path.exists(dir):
