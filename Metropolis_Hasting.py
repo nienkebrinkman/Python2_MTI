@@ -93,7 +93,7 @@ class MH_algorithm:
         G_window, d_obs_window = self.window.get_windows(self.traces,G)
         moment_window = self.inv.Solve_damping_smoothing(d_obs_window,G_window)
         d_syn_window = np.matmul(G_window, moment_window)
-        return d_syn_window, moment_window
+        return d_syn_window, moment_window, d_obs_window
 
     def write(self,txt_file):
         txt_file.write("%s\n\r" % self.par['VELOC']) # Velocity model used
@@ -142,7 +142,7 @@ class MH_algorithm:
             ## Starting parameters and create A START MODEL (MODEL_OLD):
             epi_old, depth_old, time_old = self.model_samples()
             if window == True:
-                d_syn_old, moment_old = self.Window_function(epi_old, depth_old, time_old)
+                d_syn_old, moment_old,self.d_obs = self.Window_function(epi_old, depth_old, time_old)
             else:
                 d_syn_old, moment_old = self.G_function(epi_old, depth_old, time_old)
             plt.plot(d_syn_old, alpha=0.2)
@@ -156,7 +156,7 @@ class MH_algorithm:
             for i in range(self.sampler['sample_number']):
                 epi, depth, time = self.model_samples()
                 if window == True:
-                    d_syn, moment = self.Window_function(epi, depth, time)
+                    d_syn, moment,self.d_obs = self.Window_function(epi, depth, time)
                 else:
                     d_syn, moment = self.G_function(epi, depth, time)
                 misfit = Misfit()
