@@ -4,11 +4,12 @@ import os
 import mpi4py as MPI
 from mpi4py import MPI
 import matplotlib.pyplot as plt
+import pylab
 
 from Inversion_problems import Inversion_problem
 from Misfit import Misfit
 from Source_code import Source_code
-from Plots import Plots
+
 
 
 class MH_algorithm:
@@ -90,10 +91,10 @@ class MH_algorithm:
 
     def Window_function(self, epi, depth, t):
         G = self.generate_G(epi, depth, t)
-        G_window, d_obs_window = self.window.get_windows(self.traces,G)
+        G_window, d_obs_window, trace_window = self.window.get_windows(self.traces,G,epi,depth)
         moment_window = self.inv.Solve_damping_smoothing(d_obs_window,G_window)
         d_syn_window = np.matmul(G_window, moment_window)
-        return d_syn_window, moment_window, d_obs_window
+        return d_syn_window, moment_window, d_obs_window,trace_window
 
     def write(self,txt_file):
         txt_file.write("%s\n\r" % self.par['VELOC']) # Velocity model used
@@ -134,18 +135,41 @@ class MH_algorithm:
         txt_file.write("%i\n\r" % self.sampler['depth']['step'])  #
 
     def processing(self, savepath, window):
+        params = {'legend.fontsize': 'x-large',
+                  'figure.figsize': (20, 15),
+                  'axes.labelsize': 25,
+                  'axes.titlesize': 'x-large',
+                  'xtick.labelsize': 25,
+                  'ytick.labelsize': 25}
+        pylab.rcParams.update(params)
         self.inv = Inversion_problem( self.par)
         if window == True:
-            self.window = Source_code(self.par,self.db)
+            self.window = Source_code(self.par['VELOC_taup'],self.db)
         with open(savepath, 'w') as yaml_file:
             self.write(yaml_file) # Writes all the parameters used for this inversion
             ## Starting parameters and create A START MODEL (MODEL_OLD):
             epi_old, depth_old, time_old = self.model_samples()
             if window == True:
-                d_syn_old, moment_old,self.d_obs = self.Window_function(epi_old, depth_old, time_old)
+                d_syn_old, moment_old,self.d_obs,trace_window = self.Window_function(epi_old, depth_old, time_old)
+                f, (ax1, ax2, ax3) = plt.subplots(3, sharex=True, sharey=True)
+                trace_z = np.zeros(len(self.traces[0]))
+                trace_r = np.zeros(len(self.traces[1]))
+                trace_t = np.zeros(len(self.traces[2]))
+                trace_z[trace_window['0']['P_min']:trace_window['0']['P_max']] = trace_window['0']['p_array']
+                trace_z[trace_window['0']['S_min']:trace_window['0']['S_max']] = trace_window['0']['s_array']
+                trace_r[trace_window['1']['P_min']:trace_window['1']['P_max']] = trace_window['1']['p_array']
+                trace_r[trace_window['1']['S_min']:trace_window['1']['S_max']] = trace_window['1']['s_array']
+                trace_t[trace_window['2']['P_min']:trace_window['2']['P_max']] = trace_window['2']['p_array']
+                trace_t[trace_window['2']['S_min']:trace_window['2']['S_max']] = trace_window['2']['s_array']
             else:
                 d_syn_old, moment_old = self.G_function(epi_old, depth_old, time_old)
-            plt.plot(d_syn_old, alpha=0.2)
+                trace_z= d_syn_old[0:len(self.traces[0])]
+                trace_r= d_syn_old[len(self.traces[0]):len(self.traces[0])*2]
+                trace_t= d_syn_old[len(self.traces[0])*2:len(self.traces[0])*3]
+                f, (ax1, ax2, ax3) = plt.subplots(3, sharex=True, sharey=True)
+            ax1.plot(trace_z, alpha=0.2)
+            ax2.plot(trace_r, alpha=0.2)
+            ax3.plot(trace_t, alpha=0.2)
 
             misfit = Misfit()
             Xi_old = misfit.get_xi(self.d_obs, d_syn_old, self.sampler['var_est'])
@@ -156,14 +180,34 @@ class MH_algorithm:
             for i in range(self.sampler['sample_number']):
                 epi, depth, time = self.model_samples()
                 if window == True:
-                    d_syn, moment,self.d_obs = self.Window_function(epi, depth, time)
+                    d_syn, moment,self.d_obs,trace_window = self.Window_function(epi, depth, time)
+
                 else:
                     d_syn, moment = self.G_function(epi, depth, time)
+
                 misfit = Misfit()
                 Xi_new = misfit.get_xi(self.d_obs, d_syn, self.sampler['var_est'])
                 random = np.random.random_sample((1,))
                 if Xi_new < Xi_old or (Xi_old / Xi_new) > random:
-                    plt.plot(d_syn, alpha=0.2)
+                    if window == True:
+
+                        trace_z = np.zeros(len(self.traces[0]))
+                        trace_r = np.zeros(len(self.traces[1]))
+                        trace_t = np.zeros(len(self.traces[2]))
+                        trace_z[trace_window['0']['P_min']:trace_window['0']['P_max']] = trace_window['0']['p_array']
+                        trace_z[trace_window['0']['S_min']:trace_window['0']['S_max']] = trace_window['0']['s_array']
+                        trace_r[trace_window['1']['P_min']:trace_window['1']['P_max']] = trace_window['1']['p_array']
+                        trace_r[trace_window['1']['S_min']:trace_window['1']['S_max']] = trace_window['1']['s_array']
+                        trace_t[trace_window['2']['P_min']:trace_window['2']['P_max']] = trace_window['2']['p_array']
+                        trace_t[trace_window['2']['S_min']:trace_window['2']['S_max']] = trace_window['2']['s_array']
+                    else:
+                        trace_z = d_syn_old[0:len(self.traces[0])]
+                        trace_r = d_syn_old[len(self.traces[0]):len(self.traces[0]) * 2]
+                        trace_t = d_syn_old[len(self.traces[0]) * 2:len(self.traces[0]) * 3]
+
+                    ax1.plot(trace_z, alpha=0.2)
+                    ax2.plot(trace_r, alpha=0.2)
+                    ax3.plot(trace_t, alpha=0.2)
                     yaml_file.write("%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4r,%.4f,%.4f\n\r" % (
                         epi, depth, time.timestamp, Xi_new, moment[0], moment[1], moment[2], moment[3],
                         moment[4]))
@@ -177,11 +221,15 @@ class MH_algorithm:
                         epi_old,  depth_old, time_old.timestamp, Xi_old, moment_old[0], moment_old[1],
                         moment_old[2], moment_old[3], moment_old[4]))
                     continue
-            plt.plot(self.d_obs,linestyle=':',label="Observed data")
-            plt.xlabel("Time")
-            plt.ylabel("Displacement")
-            plt.legend()
+            ax1.plot(self.traces[0], linestyle=':', label="Observed data")
+            ax2.plot(self.traces[1], linestyle=':')
+            ax3.plot(self.traces[2], linestyle=':')
+            f.subplots_adjust(hspace=0)
+            # plt.setp([a.get_xticklabels() for a in f.axes[:-1]], visible=False)
+            ax1.legend()
+            plt.xlabel('Time [s]')
             plt.savefig(savepath.strip('.txt')+'_%i.pdf'%(self.sampler['sample_number']))
+            plt.close()
         yaml_file.close()
 
     def test_samples(self):
@@ -201,7 +249,7 @@ class MH_algorithm:
 # ---------------------------------------------------------------------------------------------------------------------#
 #                                                 RUN parallel                                                         #
 # ---------------------------------------------------------------------------------------------------------------------#
-    def do_parallel(self):
+    def do_parallel(self,window=True):
         comm = MPI.COMM_WORLD
         rank = comm.Get_rank()
         size = comm.Get_size()
@@ -212,10 +260,10 @@ class MH_algorithm:
             os.makedirs(dir_proc)
         filepath_proc = dir_proc + '/file_proc_%i.txt' % rank
         try:
-            self.processing(filepath_proc, window=True)
+            self.processing(filepath_proc, window=window)
         except TypeError:
             print ("TypeError in rank: %i" %rank)
-            self.processing(filepath_proc,window=True)
+            self.processing(filepath_proc,window=window)
 
         comm.bcast()  # All the processor wait until they are all at this point
         if rank == 0:

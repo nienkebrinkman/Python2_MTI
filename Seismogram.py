@@ -15,7 +15,7 @@ class Seismogram:
         self.source = instaseis.Source(latitude=self.par['la_s'], longitude=self.par['lo_s'],
                                        depth_in_m=self.par['depth_s'], m_tp=self.par['m_tp'], m_rp=self.par['m_rp'],
                                        m_rt=self.par['m_rt'], m_pp=self.par['m_pp'], m_tt=self.par['m_tt'],
-                                       m_rr=self.par['m_rr'])
+                                       m_rr=self.par['m_rr'],origin_time=self.par['origin_time'])
 
     def get(self):
         traces = self.db.get_seismograms(source=self.source, receiver=self.receiver, components=self.par['components'],
