@@ -6,9 +6,8 @@ class Misfit:
         RMS = np.sqrt(np.sum(data_obs - data_syn) ** 2 / N)
         return RMS
 
-    def get_xi(self, data_obs, data_syn, var_est):
-        d_obs_mean = np.mean(data_obs)
-        var = var_est * d_obs_mean
+    def get_xi(self, data_obs, data_syn, var):
+
         likelihood = np.matmul((data_obs - data_syn).T, (data_obs - data_syn)) / (2 * (var ** 2))
         return likelihood
 

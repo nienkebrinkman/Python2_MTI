@@ -2,9 +2,8 @@ from obspy.taup import TauPyModel
 import numpy as np
 
 class Source_code:
-    def __init__(self, veloc_model, db):
+    def __init__(self, veloc_model):
         self.veloc_model=veloc_model
-        self.db = db
 
 
     def get_P(self,epi,depth_m):
@@ -44,7 +43,7 @@ class Source_code:
             s_array = trace[sample_S_min:sample_S_max]
             new_trace = np.append(new_trace, s_array)
 
-            save_windows.update({'%i'%i: {'P_min':sample_P_min,'P_max':sample_P_max, 'p_array':p_array,'S_min':sample_S_min,'S_max':sample_S_max,'s_array':s_array}})
+            save_windows.update({'%i'%i: {'P_min':sample_P_min,'P_max':sample_P_max, 'P_len':len(p_array),'S_min':sample_S_min,'S_max':sample_S_max,'S_len':len(s_array)}})
 
             ## Get P- & S- windows also from the G matrix:
             G_P = G[sample_P_min+len(trace)*i:sample_P_max+ len(trace)*i, :]
