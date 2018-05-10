@@ -7,6 +7,9 @@ import numpy as np
 import itertools
 import glob
 import pandas as pd
+import matplotlib.pylab as plt
+import obspy
+import matplotlib
 import instaseis
 import yaml
 
@@ -45,19 +48,7 @@ class Post_processing:
             yaml_file.close()
             return save_path, filename
 
-            # else:
-            #     with open(save_path, 'w') as outfile:
-            #         for i,fname in enumerate(filenames):
-            #             with open(fname) as infile:
-            #                 if i == 0:
-            #                     data = np.genfromtxt(infile, delimiter=',', skip_footer=1)
-            #                     for line in infile:
-            #                         outfile.write(line)
-            #                 else:
-            #                     data = np.genfromtxt(infile, delimiter=',', skip_header=70, skip_footer=1)
-            #                     for line in itertools.islice(infile,35,None):
-            #                         outfile.write(line)
-            #
+
 
     def get_pdf(self, savename, directory, filepath):
         # PDF plots will be made
@@ -82,6 +73,10 @@ class Post_processing:
                          'Depth': data[1],
                          'Time': data[2],
                          'Misfit': data[3]}
+
+            # times = matplotlib.dates.num2date(data_dict['Time'])
+            # mean_time = (min(data_dict['Time']) + max(data_dict['Time']) ) / 2
+            # time=obspy.UTCDateTime(mean_time)
 
             pdf = Plots()
             for i, value in data_dict.iteritems():
@@ -159,10 +154,48 @@ class Post_processing:
 
         ## Kernel Density approximation
         plot.Kernel_density(data=df, data_x="Epicentral_distance", data_y="Depth", parameters=parameters,
-                            directory=dir_seaborn, savename=savename)
+                            directory=dir_seaborn, savename=savename.strip(".yaml"))
 
         ## Pair Grid approximation
         # plot.Pair_Grid(data=df_select,directory=directory,savename=savename)
+
+    def event_plot(self,filepath):
+        if filepath.endswith('.yaml') == True:
+            with open(filepath, 'r') as stream:
+                data_file = yaml.load(stream)
+                stream.close()
+                data = data_file['data']
+                parameters = data_file['parameters']
+
+        else:
+            parameters = open(filepath, "r").readlines()[:35]
+            data = np.transpose(np.loadtxt(filepath, delimiter=',', skiprows=70))
+        la_r = parameters['la_r']
+        lo_r = parameters['lo_r']
+        la_s = parameters['la_s']
+        lo_s = parameters['lo_s']
+        plots = Plots()
+        plots.plot_real_event(la_r,lo_r,la_s,lo_s)
+
+
+    def get_seismogram_plots(self,directory):
+        dir = directory + '/proc'
+        filenames = glob.glob("%s/*.yaml" % dir)
+        for file in filenames:
+            with open(file,'r') as stream:
+                data = yaml.load(stream)
+                stream.close
+            a=1
+            f, (ax1, ax2, ax3) = plt.subplots(3, sharex=True, sharey=True)
+            for i,v in data.iteritems():
+                ax1.plot(v['trace_z'], alpha=0.2)
+                ax2.plot(v['trace_r'], alpha=0.2)
+                ax3.plot(v['trace_t'], alpha=0.2)
+            plt.show()
+
+
+
+
 
     def write_to_dict(self, list_of_parameters):
         parameters = {
