@@ -20,7 +20,7 @@ class Source_code:
         return tt[0].time
 
 
-    def get_windows(self, traces, G, epi,depth_m):
+    def get_windows(self, traces, epi,depth_m, G=None,  G_exist = True):
         tt_P = self.get_P(epi,depth_m)  # Estimated P-wave arrival, based on the known velocity model
         tt_S = self.get_S(epi,depth_m)  # Estimated S-wave arrival, based on the known velocity model
         sec_per_sample = 1 / (traces[0].meta.sampling_rate)
@@ -44,11 +44,14 @@ class Source_code:
             new_trace = np.append(new_trace, s_array)
 
             save_windows.update({'%i'%i: {'P_min':sample_P_min,'P_max':sample_P_max, 'P_len':len(p_array),'S_min':sample_S_min,'S_max':sample_S_max,'S_len':len(s_array)}})
-
-            ## Get P- & S- windows also from the G matrix:
-            G_P = G[sample_P_min+len(trace)*i:sample_P_max+ len(trace)*i, :]
-            G_S = G[sample_S_min+ len(trace)*i:sample_S_max+ len(trace)*i, :]
-            G_new = np.vstack((G_P, G_S)) if i == 0 else np.vstack((G_new, G_P, G_S))
-        return G_new, new_trace,save_windows
+            if G_exist == True:
+                ## Get P- & S- windows also from the G matrix:
+                G_P = G[sample_P_min+len(trace)*i:sample_P_max+ len(trace)*i, :]
+                G_S = G[sample_S_min+ len(trace)*i:sample_S_max+ len(trace)*i, :]
+                G_new = np.vstack((G_P, G_S)) if i == 0 else np.vstack((G_new, G_P, G_S))
+        if G_exist ==True:
+            return G_new, new_trace, save_windows
+        else:
+            return new_trace, save_windows
 
 

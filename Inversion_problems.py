@@ -47,6 +47,17 @@ class Inversion_problem:
         # M_regul = np.matmul(np.matmul(np.matmul(np.matmul(V, T_diag), np.linalg.pinv(s_diag)), U.T), self.data)
         return M_SVD
 
+    def Solve_sdr(self,d_obs,moment):
+        I = np.eye(self.m_ref.__len__())
+        I[1, :] = 0  # Because m1+m2+m3=0
+        trace = np.array([1, 1, 0, 0, 0])
+        trace.shape = (1, 5)
+        trace_matrix = np.matmul(trace.T, trace)
+        G = (np.matmul( (d_obs + self.alpha**2 * self.m_ref), moment.T )) - self.alpha * I - self.beta**2 *I
+
+        return G
+
+
 
 # class Inversion_problem:
 #     def __init__(self, data, G, PARAMETERS):
