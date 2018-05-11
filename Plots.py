@@ -3,6 +3,7 @@ import pylab
 import numpy as np
 import os
 import seaborn as sns
+import obspy
 # import mplstereonet
 import yaml
 import itertools
@@ -135,6 +136,11 @@ class Plots:
         plt.hist(data, bins=amount_bins)
         plt.xlabel('%s' % name)
         plt.ylabel('Frequency')
+        if name == 'Time':
+            labels = np.ones_like(data)
+            for i,v in enumerate(data):
+                labels[i] = obspy.UTCDateTime(data[i])
+            plt.xticks(data, labels, rotation='vertical')
         dir_proc = directory + '/1D_margi_Plots/%s' % filename
         if not os.path.exists(dir_proc):
             os.makedirs(dir_proc)
@@ -181,30 +187,98 @@ class Plots:
 
         burnin = 980
         data = np.transpose(np.loadtxt(filepath, delimiter=','))
-        data_dict = {'Epicentral_distance': data[0],
-                     'Depth': data[1],
-                     'Time': data[2]}
 
+        data_dict = {'Strike': data[0],
+                     'Dip': data[1],
+                     'Rake': data[2]}
         sns.set_style("darkgrid")
-        plt.scatter(data_dict['Epicentral_distance'][burnin], data_dict['Depth'][burnin], marker='^',
+        plt.scatter(data_dict['Strike'][burnin], data_dict['Rake'][burnin], marker='^',
                     label="Start_point")
-        plt.plot(data_dict['Epicentral_distance'][burnin:], data_dict['Depth'][burnin:], linestyle=':',
+        plt.plot(data_dict['Strike'][burnin:], data_dict['Rake'][burnin:], linestyle=':',
                  label="sample_lag")
-        plt.scatter(data_dict['Epicentral_distance'][burnin + 1:], data_dict['Depth'][burnin + 1:], label="Sample")
-        plt.xlabel("Epicentral Distance")
-        plt.ylabel("Depth")
+        plt.scatter(data_dict['Strike'][burnin + 1:], data_dict['Rake'][burnin + 1:], label="Sample")
+        plt.xlabel("Strike")
+        plt.ylabel("Rake")
         plt.legend()
         plt.savefig(dir_path)
 
-    def polar_plot(self):
-        f, axarr = plt.subplots(2, 2, subplot_kw=dict(projection='polar'))
-        axarr[0, 0].plot(x, y)
-        axarr[0, 0].set_title('Axis [0,0]')
-        axarr[0, 1].scatter(x, y)
-        axarr[0, 1].set_title('Axis [0,1]')
-        axarr[1, 0].plot(x, y ** 2)
-        axarr[1, 0].set_title('Axis [1,0]')
-        axarr[1, 1].scatter(x, y ** 2)
-        axarr[1, 1].set_title('Axis [1,1]')
-        # Fine-tune figure; make subplots farther from each other.
-        f.subplots_adjust(hspace=0.3)
+
+        # data = np.transpose(np.loadtxt(filepath, delimiter=','))
+        # data_dict = {'Epicentral_distance': data[0],
+        #              'Depth': data[1],
+        #              'Time': data[2]}
+
+        # sns.set_style("darkgrid")
+        # plt.scatter(data_dict['Epicentral_distance'][burnin], data_dict['Depth'][burnin], marker='^',
+        #             label="Start_point")
+        # plt.plot(data_dict['Epicentral_distance'][burnin:], data_dict['Depth'][burnin:], linestyle=':',
+        #          label="sample_lag")
+        # plt.scatter(data_dict['Epicentral_distance'][burnin + 1:], data_dict['Depth'][burnin + 1:], label="Sample")
+        # plt.xlabel("Epicentral Distance")
+        # plt.ylabel("Depth")
+        # plt.legend()
+        # plt.savefig(dir_path)
+
+    def plot_seismogram_during_MH(self,ax1,ax2,ax3,d_syn,trace_window=None,savepath =None,window = False,final_plot=False):
+        params = {'legend.fontsize': 'x-large',
+                  'figure.figsize': (20, 15),
+                  'axes.labelsize': 25,
+                  'axes.titlesize': 'x-large',
+                  'xtick.labelsize': 25,
+                  'ytick.labelsize': 25}
+        pylab.rcParams.update(params)
+        if final_plot == True:
+            self.traces[0].data[self.traces[0].data == 0] = np.nan
+            self.traces[1].data[self.traces[1].data == 0] = np.nan
+            self.traces[2].data[self.traces[2].data == 0] = np.nan
+
+            ax1.plot(self.traces[0], linestyle=':', label="Observed data")
+            ax2.plot(self.traces[1], linestyle=':')
+            ax3.plot(self.traces[2], linestyle=':')
+            ax1.legend()
+            # plt.plot(self.d_obs, ":")
+            plt.xlabel('Time [s]')
+            plt.savefig(savepath.strip('.txt') + '_%i.pdf' % (self.sampler['sample_number']))
+            plt.close()
+        else:
+            if window == True:
+
+                trace_z = np.zeros(len(self.traces[0]))
+                trace_r = np.zeros(len(self.traces[1]))
+                trace_t = np.zeros(len(self.traces[2]))
+                d_syn.shape = (len(d_syn))
+                trace_z[trace_window['0']['P_min']:trace_window['0']['P_max']] = d_syn[0:trace_window['0']['P_len']]
+                trace_z[trace_window['0']['S_min']:trace_window['0']['S_max']] = d_syn[trace_window['0']['P_len']:
+                trace_window['0']['P_len'] + trace_window['0']['S_len']]
+                trace_r[trace_window['1']['P_min']:trace_window['1']['P_max']] = d_syn[trace_window['0']['P_len'] +
+                                                                                           trace_window['0']['S_len']:
+                trace_window['0']['P_len'] + trace_window['0']['S_len'] + trace_window['1']['P_len']]
+                trace_r[trace_window['1']['S_min']:trace_window['1']['S_max']] = d_syn[trace_window['0']['P_len'] +
+                                                                                           trace_window['0']['S_len'] +
+                                                                                           trace_window['1']['P_len']:
+                trace_window['0']['P_len'] + trace_window['0']['S_len'] + trace_window['1']['P_len'] +
+                trace_window['1']['S_len']]
+                trace_t[trace_window['2']['P_min']:trace_window['2']['P_max']] = d_syn[trace_window['0']['P_len'] +
+                                                                                           trace_window['0']['S_len'] +
+                                                                                           trace_window['1']['P_len'] +
+                                                                                           trace_window['1']['S_len']:
+                trace_window['0']['P_len'] + trace_window['0']['S_len'] + trace_window['1']['P_len'] +
+                trace_window['1']['S_len'] + trace_window['2']['P_len']]
+                trace_t[trace_window['2']['S_min']:trace_window['2']['S_max']] = d_syn[trace_window['0']['P_len'] +
+                                                                                           trace_window['0']['S_len'] +
+                                                                                           trace_window['1']['P_len'] +
+                                                                                           trace_window['1']['S_len'] +
+                                                                                           trace_window['2']['P_len']:]
+                trace_z[trace_z == 0] = np.nan
+                trace_r[trace_r == 0] = np.nan
+                trace_t[trace_t == 0] = np.nan
+            else:
+                trace_z = d_syn[0:len(self.traces[0])]
+                trace_r = d_syn[len(self.traces[0]):len(self.traces[0]) * 2]
+                trace_t = d_syn[len(self.traces[0]) * 2:len(self.traces[0]) * 3]
+            ax1.plot(trace_z, alpha=0.2)
+            ax2.plot(trace_r, alpha=0.2)
+            ax3.plot(trace_t, alpha=0.2)
+
+
+
