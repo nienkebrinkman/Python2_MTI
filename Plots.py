@@ -14,22 +14,30 @@ from obspy.imaging.beachball import beachball
 
 class Plots:
     def plot_real_event(self, la_r,lo_r,la_s,lo_s):
-        fig = plt.figure()
-        m = Basemap(projection='merc', llcrnrlat=-80, urcrnrlat=80,
-                    llcrnrlon=-180, urcrnrlon=180, lat_ts=20, resolution='l')
-        # draw parallels and meridians.
-        par = np.arange(-90., 91., 30.)
-        label_par = np.full(len(par), True, dtype=bool)
-        meridians = np.arange(-180., 181., 60.)
-        label_meri = np.full(len(meridians), True, dtype=bool)
-        m.drawparallels(np.arange(-90., 91., 30.), labels=label_par)
-        m.drawmeridians(np.arange(-180., 181., 60.), labels=label_meri)
+        mars_dir = '/home/nienke/Documents/Applied_geophysics/Thesis/anaconda/mars_pictures/Mars_lightgray.jpg'
 
+        fig = plt.figure()
+
+        m= Basemap(projection='moll',lon_0=round(0.0))
+
+        # draw parallels and meridians.
+        par = np.arange(-90, 90, 30)
+        label_par = np.full(len(par), True, dtype=bool)
+        meridians = np.arange(-180, 180, 30)
+        label_meri = np.full(len(meridians), True, dtype=bool)
+
+        m.drawmeridians(np.arange(-180, 180, 30),labels=label_meri)
+        m.drawparallels(np.arange(-90, 90, 30),label=label_par)
+
+
+        m.warpimage(mars_dir)
         mstatlon, mstatlat = m(lo_r, la_r)
         m.plot(mstatlon, mstatlat, 'k^', markersize=8)
+
         EQlon, EQlat = m(lo_s, la_s)
         m.plot(EQlon, EQlat, 'r*', markersize=10, zorder=10)
         plt.show()
+
 
     def Log_G(self, G):
         params = {'legend.fontsize': 'x-large',
@@ -219,7 +227,7 @@ class Plots:
         # plt.legend()
         # plt.savefig(dir_path)
 
-    def plot_seismogram_during_MH(self,ax1,ax2,ax3,d_syn,trace_window=None,savepath =None,window = False,final_plot=False):
+    def plot_seismogram_during_MH(self,ax1,ax2,ax3,d_syn,traces,savepath,final_plot=False):
         params = {'legend.fontsize': 'x-large',
                   'figure.figsize': (20, 15),
                   'axes.labelsize': 25,
@@ -228,57 +236,29 @@ class Plots:
                   'ytick.labelsize': 25}
         pylab.rcParams.update(params)
         if final_plot == True:
-            self.traces[0].data[self.traces[0].data == 0] = np.nan
-            self.traces[1].data[self.traces[1].data == 0] = np.nan
-            self.traces[2].data[self.traces[2].data == 0] = np.nan
+            traces[0].data[traces[0].data == 0] = np.nan
+            traces[1].data[traces[1].data == 0] = np.nan
+            traces[2].data[traces[2].data == 0] = np.nan
 
-            ax1.plot(self.traces[0], linestyle=':', label="Observed data")
-            ax2.plot(self.traces[1], linestyle=':')
-            ax3.plot(self.traces[2], linestyle=':')
+            ax1.plot(traces[0], linestyle=':', label="Observed data")
+            ax2.plot(traces[1], linestyle=':')
+            ax3.plot(traces[2], linestyle=':')
             ax1.legend()
             # plt.plot(self.d_obs, ":")
             plt.xlabel('Time [s]')
-            plt.savefig(savepath.strip('.txt') + '_%i.pdf' % (self.sampler['sample_number']))
+            plt.show()
+            # plt.savefig(savepath.replace('.txt','.pdf') )
             plt.close()
-        else:
-            if window == True:
 
-                trace_z = np.zeros(len(self.traces[0]))
-                trace_r = np.zeros(len(self.traces[1]))
-                trace_t = np.zeros(len(self.traces[2]))
-                d_syn.shape = (len(d_syn))
-                trace_z[trace_window['0']['P_min']:trace_window['0']['P_max']] = d_syn[0:trace_window['0']['P_len']]
-                trace_z[trace_window['0']['S_min']:trace_window['0']['S_max']] = d_syn[trace_window['0']['P_len']:
-                trace_window['0']['P_len'] + trace_window['0']['S_len']]
-                trace_r[trace_window['1']['P_min']:trace_window['1']['P_max']] = d_syn[trace_window['0']['P_len'] +
-                                                                                           trace_window['0']['S_len']:
-                trace_window['0']['P_len'] + trace_window['0']['S_len'] + trace_window['1']['P_len']]
-                trace_r[trace_window['1']['S_min']:trace_window['1']['S_max']] = d_syn[trace_window['0']['P_len'] +
-                                                                                           trace_window['0']['S_len'] +
-                                                                                           trace_window['1']['P_len']:
-                trace_window['0']['P_len'] + trace_window['0']['S_len'] + trace_window['1']['P_len'] +
-                trace_window['1']['S_len']]
-                trace_t[trace_window['2']['P_min']:trace_window['2']['P_max']] = d_syn[trace_window['0']['P_len'] +
-                                                                                           trace_window['0']['S_len'] +
-                                                                                           trace_window['1']['P_len'] +
-                                                                                           trace_window['1']['S_len']:
-                trace_window['0']['P_len'] + trace_window['0']['S_len'] + trace_window['1']['P_len'] +
-                trace_window['1']['S_len'] + trace_window['2']['P_len']]
-                trace_t[trace_window['2']['S_min']:trace_window['2']['S_max']] = d_syn[trace_window['0']['P_len'] +
-                                                                                           trace_window['0']['S_len'] +
-                                                                                           trace_window['1']['P_len'] +
-                                                                                           trace_window['1']['S_len'] +
-                                                                                           trace_window['2']['P_len']:]
-                trace_z[trace_z == 0] = np.nan
-                trace_r[trace_r == 0] = np.nan
-                trace_t[trace_t == 0] = np.nan
-            else:
-                trace_z = d_syn[0:len(self.traces[0])]
-                trace_r = d_syn[len(self.traces[0]):len(self.traces[0]) * 2]
-                trace_t = d_syn[len(self.traces[0]) * 2:len(self.traces[0]) * 3]
+        else:
+            # d_syn[d_syn == 0] = np.nan
+            trace_z = d_syn[0:len(traces[0])]
+            trace_r = d_syn[len(traces[0]):len(traces[0]) * 2]
+            trace_t = d_syn[len(traces[0]) * 2:len(traces[0]) * 3]
             ax1.plot(trace_z, alpha=0.2)
             ax2.plot(trace_r, alpha=0.2)
             ax3.plot(trace_t, alpha=0.2)
+            plt.show()
 
 
 
