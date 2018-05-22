@@ -14,7 +14,7 @@ from Plots import Plots
 from Seismogram import Seismogram
 
 
-class MH_algorithm_test:
+class MH_algorithm:
     def __init__(self, PARAMETERS, sampler, db, data, traces):
         self.db = db
         self.par = PARAMETERS
