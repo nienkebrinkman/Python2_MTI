@@ -1,6 +1,7 @@
 import numpy as np
 import obspy.signal.cross_correlation as cc
 import matplotlib.pylab as plt
+
 class Misfit:
     def get_RMS(self, data_obs, data_syn):
         N = data_syn.__len__()  # Normalization factor

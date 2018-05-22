@@ -39,7 +39,8 @@ class Get_Paramters:
             'beta': 'beta',
             'm_ref': 'm_ref',
             'VELOC_taup': 'VELOC_taup',
-            'VELOC': 'VELOC'}
+            'VELOC': 'VELOC',
+            'noise_model': 'noise_model'}
 
         # -Receiver
         PARAMETERS['la_r'] = 40  # Latitude
@@ -73,6 +74,7 @@ class Get_Paramters:
                                          lon1=PARAMETERS['lo_s'],
                                          lat2=PARAMETERS['la_r'],
                                          lon2=PARAMETERS['lo_r'], a=3389.5, f=0)
+        PARAMETERS['baz']=baz
         PARAMETERS['az'] = az
         PARAMETERS['epi'] = kilometer2degrees(dist, radius=3389.5)
 
@@ -87,8 +89,12 @@ class Get_Paramters:
         PARAMETERS['m_ref'] = np.array([1.0000e+16, 1.0000e+16, 1.0000e+16, 1.0000e+16, 1.0000e+16])
 
         # Parameters for velocity model
-        PARAMETERS['VELOC'] = 'http://instaseis.ethz.ch/marssynthetics/C30VH-BFSNL-1s'
+        PARAMETERS['VELOC'] = 'http://instaseis.ethz.ch/marssynthetics/C30VH-BFT13-1s'
         PARAMETERS['VELOC_taup'] = 'iasp91'
+
+        # Model used to add noise in seismogram:
+        PARAMETERS['noise_model'] = 'STS2'
+
         return PARAMETERS
 
     def get_MHMC_par(self, directory='/home/nienke/Documents/Applied_geophysics/Thesis/anaconda/testdata',
@@ -130,7 +136,7 @@ class Get_Paramters:
         sampler['epi']['range_min'] = PARAMETERS['epi'] - 10
         sampler['epi']['range_max'] = PARAMETERS['epi'] + 10
         sampler['epi']['step'] = 40
-        sampler['time_range'] = PARAMETERS['origin_time'].second - 30  # The time range can only vary may be two hours!!
-        sampler['sample_number'] = 1000
+        sampler['time_range'] = PARAMETERS['origin_time'].second + 30  # The time range can only vary may be two hours!!
+        sampler['sample_number'] = 100
         sampler['var_est'] = 0.05
         return sampler

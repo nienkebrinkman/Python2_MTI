@@ -100,8 +100,8 @@ class MH_algorithm:
     def G_function(self, epi, depth, t, sdr, window):
         if sdr == True:
             epi_m = degrees2kilometers(epi, radius=3389.5) * 1000
-            dict = geo.Geodesic(a=3389.5, f=0).Direct(lat1=self.par['la_r'], lon1=self.par['lo_r'], azi1=self.par['az'],
-                                                      s12=epi_m, outmask=1929)
+            dict = geo.Geodesic(a=3389.5, f=0).ArcDirect(lat1=self.par['la_r'], lon1=self.par['lo_r'], azi1=self.par['baz'],
+                                                      a12=epi_m, outmask=1929)
             strike, dip, rake = self.model_samples_sdr()
             d_syn, traces, sources = self.seis.get_seis_manual(la_s=dict['lat2'], lo_s=dict['lon2'], depth=depth,
                                                                strike=strike, dip=dip, rake=rake,
