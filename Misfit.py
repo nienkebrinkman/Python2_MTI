@@ -66,7 +66,9 @@ class Misfit:
         norm_syn= np.sqrt(np.sum((d_syn_new**2)*dt))
         norm_obs= np.sqrt(np.sum((d_obs_new**2)*dt))
 
-        CC = (max_cc) / (norm_syn * norm_obs)
-        D = 1 - CC
-        return D,time_shift
+        CC = (max_cc) / (norm_syn * norm_obs) # Cross-Correlation
+        D = 1 - CC # Decorrelation
+        misfit = ((D-0.95)**2) / (2 * (0.1)**2) # Misfit
+
+        return misfit,time_shift
 

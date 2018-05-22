@@ -17,21 +17,15 @@ get_parameters = Get_Paramters()
 PARAMETERS = get_parameters.get_initial_par()
 sampler = get_parameters.get_MHMC_par()
 
-# Print the moment that you start with (This is normally unknown and you want to get as close as possible to this one)
-moment_given = np.array(
-    [PARAMETERS['m_tt'], PARAMETERS['m_pp'], PARAMETERS['m_tp'], PARAMETERS['m_rt'], PARAMETERS['m_rp']])
-print(moment_given)
-
 # Initiate the databases from instaseis:
 db = instaseis.open_db(PARAMETERS['VELOC'])
 
 ## Step 1 - Calculate an observed seismogram = d_obs -- With or Without noise
 seis = Seismogram(PARAMETERS, db)
 # Without noise:
-d_obs, traces, source = seis.get_seis_automatic(sdr=False)
+d_obs, traces, source = seis.get_seis_automatic(sdr=True)
 # With noise:
 # d_obs, traces, source = seis.get_seis_automatic_with_noise(noise_model=PARAMETERS['noise_model'],sdr=False)
-
 
 # print(source) - This is the moment resulting from instaseis (should be the same as moment_given)
 moment_init = np.array([source.m_tt, source.m_pp, source.m_tp, source.m_rt, source.m_rp])
@@ -65,30 +59,15 @@ window = Source_code(PARAMETERS['VELOC_taup'])
 d_syn_window = window.get_windows(traces_syn, epi, depth)
 
 
-# plt.plot(d_syn_window)
-# plt.plot(d_syn, linestyle = ':')
-# plt.show()
-
 ## Step 6 - Calculate the misfit between d_obs and d_syn
 mis = Misfit()
 dt = 1 / (traces[0].meta.sampling_rate)
 misfit = mis.get_xi(d_obs,d_syn_window,sampler['var_est'],dt)
-D,time_shift = mis.get_CC(d_obs,d_syn_window,dt)
+Xi,time_shift = mis.get_CC(d_obs,d_syn_window,dt)
 
-fig = plt.figure(figsize=(20, 10))
-ax1 = fig.add_subplot(121)
-ax1.plot(d_syn)
-plt.title('Seismogram calculated with forward model')
-plt.xlabel('t')
-plt.ylabel('Forward data displacement [m]')
-plt.grid()
 
-ax2 = fig.add_subplot(122)
-ax2.plot(d_obs)
-ax2.yaxis.tick_right()
-ax2.yaxis.set_label_position("right")
-plt.title('Seismogram calculated with Instaseis')
-plt.xlabel('t')
-plt.ylabel('Instaseis data displacement [m]')
-plt.grid()
+plt.plot(d_syn_window)
+plt.plot(d_obs, linestyle = ':')
 plt.show()
+a=1
+
