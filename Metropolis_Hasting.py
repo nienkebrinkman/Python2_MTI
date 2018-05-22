@@ -37,10 +37,10 @@ class MH_algorithm_test:
         month = self.par['origin_time'].month  # Constant
         day = self.par['origin_time'].day  # Constant
         hour = self.par['origin_time'].hour  # Constant
-        sec = int(np.random.uniform(self.sampler['time_range'], self.par['origin_time'].second + 1))
-        if sec < int(0):
-            sec_new = 59 + sec
-            min = self.par['origin_time'].minute - 1  # Constant
+        sec = int(np.random.uniform(self.par['origin_time'].second, self.sampler['time_range']))
+        if sec > int(59):
+            sec_new = 59 - sec
+            min = self.par['origin_time'].minute + 1  # Constant
         else:
             sec_new = sec
             min = min = self.par['origin_time'].minute
@@ -105,18 +105,16 @@ class MH_algorithm_test:
             strike, dip, rake = self.model_samples_sdr()
             d_syn, traces, sources = self.seis.get_seis_manual(la_s=dict['lat2'], lo_s=dict['lon2'], depth=depth,
                                                                strike=strike, dip=dip, rake=rake,
-                                                               time=self.par['origin_time'], sdr=sdr)
-            # d_syn, traces, sources = self.seis.get_seis_manual(la_s=self.par['la_s'],lo_s=self.par['lo_s'],depth=self.par['depth_s'],strike=self.par['strike'],dip=self.par['dip'],rake=self.par['rake'],time=self.par['origin_time'],sdr=sdr)
+                                                               time=t, sdr=sdr)
             if window == True:
                 d_syn_window = self.window.get_windows(traces, epi, depth)
                 return d_syn_window, np.array([strike, dip, rake])
             else:
                 return d_syn, np.array([strike, dip, rake])
         else:
-            # G = self.generate_G(epi, depth, t)
-            G = self.generate_G(self.par['epi'], self.par['depth_s'], self.par['origin_time'])
+            G = self.generate_G(epi, depth, t)
             if window == True:
-                G_window = self.window.get_G(self.traces, G, self.par['epi'], self.par['depth_s'])
+                G_window = self.window.get_G(self.traces, G, epi, depth)
                 G = G_window
             moment = self.inv.Solve_damping_smoothing(self.d_obs, G)
             # TODO - choose a range for moment with the help of the Resolution Matrix
@@ -160,7 +158,10 @@ class MH_algorithm_test:
         txt_file.write("%i\n\r" % self.sampler['epi']['step'])  #
         txt_file.write("%i\n\r" % self.sampler['depth']['range_max'])  #
         txt_file.write("%i\n\r" % self.sampler['depth']['range_min'])  #
-        txt_file.write("%i\n\r" % self.sampler['depth']['step'])  #
+        txt_file.write("%i\n\r" % self.sampler['depth']['step'])
+        txt_file.write("%i,%i,%i,%i,%i,%i\n\r" % (
+        self.par['origin_time'].year, self.par['origin_time'].month, self.par['origin_time'].day,
+        self.par['origin_time'].hour, self.par['origin_time'].minute, self.par['origin_time'].second))  #
 
     def write_sample(self, yaml_file, epi, depth, min, sec, Xi, moment, sdr):
         if sdr == True:
@@ -168,9 +169,9 @@ class MH_algorithm_test:
                                                                          moment[2]))
         else:
             yaml_file.write("%.4f,%.4f,%i,%i,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f\n\r" % (
-            epi, depth, min, sec, Xi, moment[0], moment[1], moment[2], moment[3], moment[4]))
+                epi, depth, min, sec, Xi, moment[0], moment[1], moment[2], moment[3], moment[4]))
 
-    def processing(self, savepath, window, plot_modus=False, sdr=False):
+    def processing(self, savepath, window, plot_modus=False, sdr=False, misfit='L2'):
         self.inv = Inversion_problem(self.par)  # Inversion Problem
         self.seis = Seismogram(self.par, self.db)  # For generating seismogram
         if window == True:
@@ -193,25 +194,23 @@ class MH_algorithm_test:
                     plot_seis = Plots()
                     plot_seis.plot_seismogram_during_MH(ax1, ax2, ax3, d_syn_old, self.traces, savepath)
 
-            misfit = Misfit()
-            # TODO - Accept by CC values!! (and may be time_shifts)
-            CC_old, time_shift_old = misfit.get_CC(self.d_obs, d_syn_old, self.dt)
-            Xi_old = misfit.get_xi(self.d_obs, d_syn_old, self.var)
+            misfits = Misfit()
+            if misfit == 'L2':
+                Xi_old = misfits.get_xi(self.d_obs, d_syn_old, self.var,self.dt)
+            elif misfit == 'CC':
+                Xi_old, time_shift_old = misfits.get_CC(self.d_obs, d_syn_old, self.dt)
+            else:
+                raise ValueError('misfit is not specified correctly, choose either: L2 or CC in string format')
+
             if sdr == True:
                 self.write_sample(yaml_file, epi_old, depth_old, time_old.minute, time_old.second, Xi_old,
                                   moment_old, sdr)
-                yaml_file.write("%.4f,%.4f,%i,%i,%.4f,%.4f,%.4f,%.4f\n\r" % (
-                    epi_old, depth_old, time_old.minute, time_old.second, Xi_old, moment_old[0], moment_old[1],
-                    moment_old[2]))
                 # moment_old[0] = strike
                 # moment_old[1] = dip
                 # moment_old[2] = rake
             else:
                 self.write_sample(yaml_file, epi_old, depth_old, time_old.minute, time_old.second, Xi_old,
                                   moment_old, sdr)
-                yaml_file.write("%.4f,%.4f,%i,%i,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f\n\r" % (
-                    epi_old, depth_old, time_old.minute, time_old.second, Xi_old, moment_old[0], moment_old[1],
-                    moment_old[2], moment_old[3], moment_old[4]))
                 # moment_old[0] = Mxx
                 # moment_old[1] = Myy
                 # moment_old[2] = Mxy
@@ -226,14 +225,16 @@ class MH_algorithm_test:
                 else:
                     d_syn, moment = self.G_function(epi, depth, time, sdr, window)
 
-                misfit = Misfit()
-                Xi_new = misfit.get_xi(self.d_obs, d_syn, self.var)
+                if misfit == 'L2':
+                    Xi_new = misfits.get_xi(self.d_obs, d_syn, self.var,self.dt)
+                elif misfit == 'CC':
+                    Xi_new, time_shift_old = misfits.get_CC(self.d_obs, d_syn, self.dt)
                 random = np.random.random_sample((1,))
                 if Xi_new < Xi_old or (Xi_old / Xi_new) > random:
                     if plot_modus == True:
                         plot_seis.plot_seismogram_during_MH(ax1, ax2, ax3, d_syn, self.traces, savepath)
                     if sdr == True:
-                        self.write_sample(yaml_file, epi, depth, time.minute, time.second, Xi_new,moment, sdr)
+                        self.write_sample(yaml_file, epi, depth, time.minute, time.second, Xi_new, moment, sdr)
                     else:
                         self.write_sample(yaml_file, epi, depth, time.minute, time.second, Xi_new, moment, sdr)
                     Xi_old = Xi_new
@@ -273,7 +274,11 @@ class MH_algorithm_test:
     # ---------------------------------------------------------------------------------------------------------------------#
     #                                                 RUN parallel                                                         #
     # ---------------------------------------------------------------------------------------------------------------------#
-    def do_parallel(self, window=True, sdr=False, plot_modus=False):
+    def do_parallel(self, window=True, sdr=False, plot_modus=False, misfit='L2'):
+        # Misfit options:
+        #   - 'L2' - L2_Norm
+        #   - 'CC' - Cross_correlation
+
         comm = MPI.COMM_WORLD
         rank = comm.Get_rank()
         size = comm.Get_size()
@@ -287,10 +292,10 @@ class MH_algorithm_test:
             os.makedirs(dir_proc)
         filepath_proc = dir_proc + '/file_proc_%i.txt' % rank
         try:
-            self.processing(filepath_proc, window=window, plot_modus=plot_modus, sdr=sdr)
+            self.processing(filepath_proc, window=window, plot_modus=plot_modus, sdr=sdr, misfit=misfit)
         except TypeError:
             print ("TypeError in rank: %i" % rank)
-            self.processing(filepath_proc, window=window, plot_modus=plot_modus, sdr=sdr)
+            self.processing(filepath_proc, window=window, plot_modus=plot_modus, sdr=sdr, misfit=misfit)
 
         comm.bcast()  # All the processor wait until they are all at this point
         if rank == 0:
