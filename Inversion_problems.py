@@ -1,14 +1,14 @@
 import numpy as np
 class Inversion_problem:
-    def __init__(self, PARAMETERS):
-        self.alpha = PARAMETERS['alpha']
-        self.beta = PARAMETERS['beta']
-        self.m_ref = PARAMETERS['m_ref']
+    def __init__(self, PRIOR):
+        self.alpha = PRIOR['alpha']
+        self.beta = PRIOR['beta']
+        self.m_ref = PRIOR['m_ref']
 
     def Solve_LS(self,data,G):
         M = np.linalg.lstsq(G, data)
         print('Least-square: \n %s' % M[0])
-        return M
+        return M[0]
 
     def Solve_regularization(self,data,G):
         M = np.matmul(np.matmul(np.linalg.inv(np.matmul(G.T, G)), G.T), data)
@@ -31,7 +31,7 @@ class Inversion_problem:
         M = np.matmul(
             np.linalg.inv(np.matmul(G.T, G) + (I * self.alpha ** 2) + self.beta ** 2 * trace_matrix),
             (np.matmul(G.T, data) + np.matmul((I * self.alpha ** 2), self.m_ref)))
-        print('Damping & smoothening:\n %s' % M)
+        print('Damping & smoothening:\nm_xx = %.1f \nm_yy=%.1f \nm_xy=%.1f \nm_xz=%.1f\nm_yz=%.1f"' %(M[0],M[1],M[2],M[3],M[4]))
         return M
 
     def Solve_SVD(self,data,G):
