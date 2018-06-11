@@ -107,8 +107,8 @@ class MCMC_stream:
             rejected = 0
             for i in range(self.prior['sample_number']):
                 if i % 10 == 0:
-                    print "proposal: %i, accepted: %i" % (i, accepted)
-                    print "proposal: %i, rejected: %i" % (i, rejected)
+                    print("proposal: %i, accepted: %i" % (i, accepted))
+                    print("proposal: %i, rejected: %i" % (i, rejected))
 
                 if i ==0 or self.MCMC == 'MH':
                     epi,depth = self.model_samples()
