@@ -78,8 +78,8 @@ class Get_Paramters:
             'var_est': 'var_est'}
 
         # - Radius of the body used:
-        PRIOR['radius'] = 3389.5 # Mars
-        # PRIOR['radius'] = 6371# Earth
+        # PRIOR['radius'] = 3389.5 # Mars
+        PRIOR['radius'] = 6371 # Earth
 
         # -Receiver
         PRIOR['la_r'] = 40  # Latitude -90 <> 90

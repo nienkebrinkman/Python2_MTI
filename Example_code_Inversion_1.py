@@ -6,6 +6,7 @@ import instaseis
 import numpy as np
 import matplotlib.pylab as plt
 
+
 ## All different classes:
 from Create_observed import Create_observed
 from Get_Parameters import Get_Paramters
@@ -39,6 +40,7 @@ d_obs, traces, source = create.get_seis_automatic(prior=PRIOR, noise_model=VALUE
 # s_obs      = obspy stream with 3 traces [Z,R,T], containing ONLY S windows
 traces_obs, p_obs, s_obs = create.get_window_obspy(traces, PARAMETERS['epi'], PARAMETERS['depth_s'],
                                                    PARAMETERS['origin_time'], VALUES['npts'])
+v_stack_traces_obs = 1
 
 # The relative origin time that is going to be used during further process, since origin time is supposed to be unknown:
 # time_at_receiver = UTCDateTime

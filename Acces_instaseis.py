@@ -1,194 +1,150 @@
 import instaseis
-import obspy
+import geographiclib.geodesic as geo
+import pylab
+import matplotlib.pylab as plt
+import obspy.signal.cross_correlation as cc
 import numpy as np
-import os.path
-from obspy.geodetics import kilometer2degrees
-from obspy.geodetics.base import gps2dist_azimuth
 
 ## All different classes:
-from Metropolis_Hasting import MH_algorithm
-from Inversion_problems import Inversion_problem
-from Forward_problem import Forward_problem
+from Get_Parameters import Get_Paramters
+from Source_code import Source_code
+from MCMC_stream import MCMC_stream
 from Seismogram import Seismogram
-from Green_functions import Green_functions
-# from Source_code import Source_code
-from Plots import Plots
-from MCMC_pymc import MCMC_algorithm
-from Neighborhood_algorithm import Neighborhood_algorithm
 from Misfit import Misfit
-from Post_Processing import Post_processing
+from Create_observed import Create_observed
+from Green_functions import Green_functions
+from Inversion_problems import Inversion_problem
 
-## Velocity model:
-VELOC = 'http://instaseis.ethz.ch/marssynthetics/C30VH-BFT13-1s'
-VELOC_taup = 'iasp91'
+# Initiate Parameters:
+get_parameters = Get_Paramters()
 
-# Safe parameters:
-directory = '/home/nienke/Documents/Applied_geophysics/Thesis/anaconda/testdata'
-filename = 'test_euler.txt'
-filepath = os.path.join(directory, filename)
-
-## Parameters:
-PARAMETERS = {
-    'la_s': 'la_s',
-    'la_r': 'la_r',
-    'lo_s': 'lo_s',
-    'network': 'network',
-    'strike': 'strike',
-    'dip': 'dip',
-    'rake': 'rake',
-    'm_rr': 'm_rr',
-    'm_tt': 'm_tt',
-    'm_pp': 'm_pp',
-    'm_rt': 'm_rt',
-    'm_rp': 'm_rp',
-    'm_tp': 'm_tp',
-    'origin_time': 'origin_time',
-    'filter': 'filter',
-    'freq_filter': 'freq_filter',
-    'az ': 'az',
-    'epi': 'epi',
-    'kind': 'displacement',
-    'kernelwidth': 'kernelwidth',
-    'definition': 'definition',
-    'components': 'components',
-    'alpha': 'alpha',
-    'beta': 'beta',
-    'm_ref': 'm_ref',
-    'VELOC_taup':VELOC_taup}
-
-# -Receiver
-PARAMETERS['la_r'] = 40.0  # Latitude
-PARAMETERS['lo_r'] = 20.0  # Longitude
-PARAMETERS['network'] = "7J"  # Network
-PARAMETERS['station'] = "SYNT1"  # Station
-
-# -Source
-PARAMETERS['la_s'] = 10.0
-PARAMETERS['lo_s'] = 12.0
-PARAMETERS['depth_s'] = 1000
-PARAMETERS['strike'] = 79
-PARAMETERS['dip'] = 10
-PARAMETERS['rake'] = 20
-PARAMETERS['M0'] = 1E17
-# PARAMETERS['m_tt']=1.810000e+22
-# PARAMETERS['m_pp']=-1.740000e+24
-# PARAMETERS['m_rr']=1.710000e+24
-# PARAMETERS['m_tp']=-1.230000e+24
-# PARAMETERS['m_rt']=1.990000e+23
-# PARAMETERS['m_rp']=-1.050000e+23
-PARAMETERS['origin_time'] = obspy.UTCDateTime(2020, 1, 2, 3, 4, 5)
-PARAMETERS['components'] = ["Z", "R", "T"]
-
-# -filter
-PARAMETERS['filter'] = 'highpass'
-PARAMETERS['freq_filter'] = 1.0
-
-# -Greens function
-dist, az, baz = gps2dist_azimuth(lat1=PARAMETERS['la_s'],
-                                 lon1=PARAMETERS['lo_s'],
-                                 lat2=PARAMETERS['la_r'],
-                                 lon2=PARAMETERS['lo_r'], a=3389.5, f=0)
-PARAMETERS['az'] = az
-PARAMETERS['epi'] = kilometer2degrees(dist, radius=3389.5)
-PARAMETERS['kind'] = 'displacement'
-PARAMETERS['kernelwidth'] = 12
-PARAMETERS['definition'] = 'seiscomp'
-
-# -Inversion parameters
-PARAMETERS['alpha'] = 10 ** (-23)
-PARAMETERS['beta'] = 10 ** (-23)
-PARAMETERS['m_ref'] = np.array([1.0000e+16, 1.0000e+16, 1.0000e+16, 1.0000e+16, 1.0000e+16])
-
-## - Sampler:
-sampler = {
-    'depth': {'range_min': 'min', 'range_max': 'max', 'step': 'step'},
-    'epi': {'range_min': 'min', 'range_max': 'max', 'step': 'step'},
-    'azimuth': {'range_min': 'min', 'range_max': 'max', 'step': 'step'},
-    'time_range': 'time_range',
-    'moment_range': 'moment_range',
-    'sample_number': 'sample_number',
-    'var_est': 'var_est',
-    'directory': directory,
-    'filename': filename,
-    'filepath': filepath }
-sampler['depth']['range_min'] = 800
-sampler['depth']['range_max'] = 1200
-sampler['depth']['step'] = 20
-sampler['epi']['range_min'] = 20
-sampler['epi']['range_max'] = 40
-sampler['epi']['step'] = 40
-sampler['azimuth']['range_min'] = 2
-sampler['azimuth']['range_max'] = 22
-sampler['azimuth']['step'] = 22
-sampler['time_range'] = PARAMETERS['origin_time'].hour - 1  # The time range can only vary may be two hours!!
-sampler['sample_number'] = 1000
-sampler['var_est'] = 0.05
+PARAMETERS = get_parameters.get_unkown()
+PRIOR = get_parameters.get_prior()
+VALUES = get_parameters.specifications()
 
 
-def main():
+## DISCUSS THIS!!!!
+PRIOR['az'] = PARAMETERS['az']
+PRIOR['baz'] = PARAMETERS['baz']
 
-    ## Post - Processing [processing the results from inversion]
-    result = Post_processing(sampler)
-    save_path , savename = result.combine_parallel()
-    result.get_pdf(save_path,savename,sampler['directory'])
+# Initiate the databases from instaseis:
+db = instaseis.open_db(PRIOR['VELOC'])
+create = Create_observed(PRIOR,PARAMETERS,db)
 
-    ## Plot marginal 2d Histogram of Data from Metropolis hasting
+d_obs, traces, source = create.get_seis_automatic(prior=PRIOR,noise_model=VALUES['noise'],sdr=VALUES['sdr'])
+traces_obs, p_obs, s_obs = create.get_window_obspy(traces,PARAMETERS['epi'],PARAMETERS['depth_s'],PARAMETERS['origin_time'],VALUES['npts'])
+time_at_receiver = create.get_receiver_time(PARAMETERS['epi'],PARAMETERS['depth_s'],traces)
+time_between_windows = create.time_between_windows(PARAMETERS['epi'],PARAMETERS['depth_s'],traces[0].meta.delta)
+traces_obs.plot()
 
-    # plot=Plots()
-    # plot.make_PDF(sampler)
+#----------------------------------------------------------------------------------------------------------------------#
 
-    # plot.make_PDF(sampler)
-
-    ## Obtain database to create both Seismograms and Greens_functions:
-
-    db = instaseis.open_db(VELOC)
-
-    ## Make seismogram:
-
-    seis = Seismogram(PARAMETERS, db)
-    u, traces, source = seis.get()  # u = stacked seismograms , traces = 3 component seismogram separated
-
-    ## MCMC algorithm
-
-    # MCMC = MCMC_algorithm(sampler,u)
-    # MCMC.Instaseis(PARAMETERS, db)
+# Now we can Run a Monte Carlo algorthm:
+# M_algorithm = MCMC_stream(traces_obs,p_obs,s_obs, PRIOR,db,VALUES,time_at_receiver)
+# M_algorithm.start_MCMC(savepath=VALUES['directory'] + '/mcmc_stream.txt')
+#
+#
+seis = Seismogram(PRIOR,db)
+window_code = Source_code(PRIOR['VELOC_taup'])
 
 
-    ## Metropolis Hasting Algorithm
+# dep = np.linspace(PRIOR['depth']['range_min'], PRIOR['depth']['range_max'],1000)
+# epi = np.linspace(PRIOR['epi']['range_min'],PRIOR['epi']['range_max'],1000)
 
-    MH = MH_algorithm(PARAMETERS, sampler, db, u)
-    Parallel = MH.do_parallel()
-    # accept_model = MH.processing(sampler['filepath'])
+dep = [PARAMETERS['depth_s']]
+epi = [PARAMETERS['epi']]
 
-    ## Get Green functions:
-    # Green = Green_functions(PARAMETERS, db)
-    # G = Green.get()
-
-    ## Obtain Seismogram and Green function with certain window
-    # source_inv = Source_code(PARAMETERS, db)
-    # G_window, u_window = source_inv.get_windows(traces, G)
-
-    ## Solve forward model:
-    # moment_init = np.array([source.m_tt, source.m_pp, -source.m_tp, source.m_rt,
-    #                         -source.m_rp])
-    # print('Initial moment: \n%s' % moment_init)
-    # forward = Forward_problem(PARAMETERS, G, moment_init)
-    # data = forward.Solve_forward()
-    #
-    # Resolution_matrix = np.matmul(np.linalg.pinv(G), G)
-    # sampler['moment_range'] = Resolution_matrix
-    #
-    #
-    # ## Solve inversion method:
-    # inverse = Inversion_problem(u, G, PARAMETERS)
-    # moment_d = inverse.Solve_damping()
-    # moment_ds = inverse.Solve_damping_smoothing()
-    # moment_svd = inverse.Solve_SVD()
-    #
-    # # Plot observed vs synthetic seismogram:
-    # plot=Plots()
-    # plot.Compare_seismograms(data,u)
+total_CC = np.array([])
+total_L2 = np.array([])
+total = np.array([])
+accepted = 0
+rejected =0
+file_path = VALUES['directory'] + '/dep_epi_trial.txt'
+with open(file_path, 'w') as save_file:
+    for i in range(1):
+        # if i == 0:
+        #     epi,dep = M_algorithm.model_samples()
+        # else:
+        #     epi,dep = M_algorithm.model_samples(epi_old,dep_old)
+        #     if epi < PRIOR['epi']['range_min'] or epi > PRIOR['epi']['range_max'] or dep < \
+        #             PRIOR['depth']['range_min'] or dep > PRIOR['depth']['range_max']:
+        #         continue
 
 
-if __name__ == '__main__':
-    main()
+        dict = geo.Geodesic(a=PRIOR['radius'], f=0).ArcDirect(lat1=PRIOR['la_r'], lon1=PRIOR['lo_r'],
+                                                     azi1=PRIOR['baz'],
+                                                     a12=epi[i], outmask=1929)
+        d_syn, tr_syn, sources = seis.get_seis_manual(la_s=dict['lat2'], lo_s=dict['lon2'], depth=dep[i],
+                                                           strike=79, dip=50, rake=20,
+                                                           time=time_at_receiver, sdr=True)
+
+        traces_syn, p_syn, s_syn = window_code.get_window_obspy(tr_syn,epi[i],dep[i],time_at_receiver,VALUES['npts'])
+
+        total_stream = traces_obs.__add__(traces_syn)
+
+
+        params = {'legend.fontsize': 'x-large',
+                  'figure.figsize': (20, 15),
+                  'axes.labelsize': 25,
+                  'axes.titlesize': 'x-large',
+                  'xtick.labelsize': 25,
+                  'ytick.labelsize': 25}
+        pylab.rcParams.update(params)
+        f, (ax1, ax2, ax3) = plt.subplots(3, sharex=True, sharey=True)
+
+
+        ax1.plot(total_stream[0],label = "Z_obs")
+        ax2.plot(total_stream[1],label = "R_obs")
+        ax3.plot(total_stream[2],label = "T_obs")
+        ax1.plot(total_stream[3],label = "Z_syn",linestyle=':')
+        ax2.plot(total_stream[4],label = "R_syn",linestyle=':')
+        ax3.plot(total_stream[5],label = "T_syn",linestyle=':')
+        ax1.legend()
+        ax2.legend()
+        ax3.legend()
+        plt.xlabel('time')
+        # plt.show()
+        plt.savefig(VALUES['directory'] + '/_%i' %(i) )
+        plt.close()
+
+
+
+        misfit = Misfit(VALUES['directory'])
+        xi_L2_new, shifts_L2 = misfit.L2_stream(p_obs,p_syn,s_obs,s_syn,time_at_receiver,PRIOR['var_est'])
+        total_L2 = np.append(total_L2, xi_L2_new)
+
+        xi_CC_new, shifts_CC = misfit.CC_stream( p_obs, p_syn, s_obs, s_syn,time_at_receiver)
+        total_CC = np.append(total_CC,xi_CC_new)
+
+        save_file.write("%.4f,%.4f,%.4f,%i\n\r" % (epi[i], dep[i],xi_CC_new,i))
+
+        # if i == 0:
+        #     xi_CC_old = xi_CC_new
+        #     epi_old = epi
+        #     dep_old = dep
+        #     save_file.write("%.4f,%.4f,%.4f\n\r" % (epi, dep, 0.00000))
+        #     continue
+        # else:
+        #
+        #     random = np.random.random_sample((1,))
+        #     if xi_CC_new < xi_CC_old or np.exp((xi_CC_old - xi_CC_new) / VALUES['temperature']) > random:
+        #
+        #         accepted +=1
+        #         print("accept = %i" % accepted)
+        #         save_file.write("%.4f,%.4f,%.4f\n\r" % (epi, dep, xi_CC_new))
+        #
+        #         shift, cc_max = cc.xcorr_3c(traces_obs, traces_syn, s_obs[0].meta.npts, components=['Z', 'R', 'T'], full_xcorr=False,
+        #                                     abs_max=True)
+        #         total = np.append(total,cc_max)
+        #         xi_CC_old = xi_CC_new
+        #         epi_old = epi
+        #         dep_old = dep
+        #     else:
+        #         rejected += 1
+        #         print("reject = %i" % rejected)
+
+save_file.close()
+
+#
+#
+#

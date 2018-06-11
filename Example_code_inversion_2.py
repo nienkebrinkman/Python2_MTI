@@ -75,7 +75,7 @@ dict = geo.Geodesic(a=PRIOR['radius'], f=0).ArcDirect(lat1=PRIOR['la_r'], lon1=P
 # traces = obspy stream with 3 traces [Z,R,T]
 # source = instaseis source
 d_syn, tr_syn, sources = seis.get_seis_manual(la_s=dict['lat2'], lo_s=dict['lon2'], depth=depth,
-                                              strike=79, dip=50, rake=20,
+                                              strike=strike, dip=dip, rake=rake,
                                               time=time_at_receiver, sdr=True)
 
 
