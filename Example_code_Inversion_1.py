@@ -40,7 +40,7 @@ d_obs, traces, source = create.get_seis_automatic(prior=PRIOR, noise_model=VALUE
 # s_obs      = obspy stream with 3 traces [Z,R,T], containing ONLY S windows
 traces_obs, p_obs, s_obs = create.get_window_obspy(traces, PARAMETERS['epi'], PARAMETERS['depth_s'],
                                                    PARAMETERS['origin_time'], VALUES['npts'])
-v_stack_traces_obs = 1
+v_stack_traces_obs =np.append( np.append(traces_obs.traces[0],traces_obs.traces[1]),traces_obs.traces[2])
 
 # The relative origin time that is going to be used during further process, since origin time is supposed to be unknown:
 # time_at_receiver = UTCDateTime
@@ -66,14 +66,14 @@ G_tot, G_z, G_r, G_t = green.get(time_at_receiver, epi, depth, VALUES['npts'])
 
 ## Step 4 - Calculate moment
 inv = Inversion_problem(PRIOR)
-moment = inv.Solve_damping_smoothing(d_obs, G_tot)
+moment = inv.Solve_damping_smoothing(v_stack_traces_obs, G_tot)
 
 ## Step 5 - Calculate synthetic data
 forward = Forward_problem(PARAMETERS, G_tot, moment)
 d_syn = forward.Solve_forward()
 
 plt.plot(d_syn)
-plt.plot(d_obs, linestyle=':')
+plt.plot(v_stack_traces_obs, linestyle=':')
 plt.show()
 
 ## Step 6 - Calculate the misfit between d_syn and d_obs

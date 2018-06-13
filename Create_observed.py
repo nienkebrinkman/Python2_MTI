@@ -66,6 +66,7 @@ class Create_observed:
         model = TauPyModel(model=self.veloc_model)
         tt = model.get_travel_times(source_depth_in_km=depth_m / 1000, distance_in_degree=epi,
                                     phase_list=['S'])
+
         return tt[0].time
 
     def get_receiver_time(self, epi, depth, d_obs_traces):
@@ -106,11 +107,11 @@ class Create_observed:
             P_trace = Trace.slice(trace, start_time_p, end_time_p)
             S_trace = Trace.slice(trace, start_time_s, end_time_s)
             stream_add = P_trace.__add__(S_trace, fill_value=0, sanity_checks=True)
-            zero_trace = Trace(np.zeros(npts),
+            zero_trace = Trace(np.zeros(npts, dtype='f'),
                         header={"starttime": start_time_p, 'delta': trace.meta.delta, "station": trace.meta.station,
                                 "network": trace.meta.network, "location": trace.meta.location,
                                 "channel": trace.meta.channel, "instaseis": trace.meta.instaseis})
-            if trace.meta.channel == u'LXT':
+            if 'T' in trace.meta.channel:
                 total_trace = zero_trace.__add__(S_trace, method=0, interpolation_samples=0, fill_value=S_trace.data,
                                       sanity_checks=True)
                 total_s_trace= total_trace.copy()
@@ -123,6 +124,27 @@ class Create_observed:
             total_stream.append(total_trace)
             # TODO Get the Rayleigh and Love windows also!!
         return total_stream,p_stream,s_stream
+
+    def get_fft(self, traces, directory):
+
+        for trace in traces:
+            npts = trace.stats.npts
+            t_tot = trace.stats.endtime.timestamp - trace.stats.starttime.timestamp
+            df = trace.stats.sampling_rate  # npts / t_tot --> same
+            dt = trace.stats.delta # t_tot / npts --> same
+            fft = np.abs(np.fft.fft(trace.data))
+            freq = np.arange(0, len(fft), 1) * df / len(fft)
+
+            fig, ax = plt.subplots()
+            ax.plot(freq, fft, label = "%s" % trace.id)
+            ax.legend()
+            plt.xlabel("Signal frequency [Hz]")
+            plt.ylabel("Amplitude [Displacement]")
+            plt.tight_layout()
+            plt.savefig(directory + '/fft_channel_%s' %trace.stats.channel)
+            plt.close()
+            print("The fft graphs are saved in: %s" %directory)
+
 
 
 

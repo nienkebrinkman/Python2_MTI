@@ -22,11 +22,11 @@ class Get_Paramters:
 
         # Construct the observed data:
         sdr = True # If True: invert Strike/Dip/Rake, If False: invert m_tt,m_pp,m_rr,m_tp,m_rt,m_rp
-        noise = True
+        noise = False
         plot_modus = False # If True: you make seismogram plots during your MCMC algorithm
         temperature = 1
         directory = '/home/nienke/Documents/Applied_geophysics/Thesis/anaconda/Results/Tuning'
-        npts = 1000 # The amount of samples of your seismogram
+        npts = 2000 # The amount of samples of your seismogram
 
 
         SPEC={
@@ -41,7 +41,7 @@ class Get_Paramters:
         return SPEC
 
 
-    def get_prior(self, estimated_epi=30.8309058515):
+    def get_prior(self, estimated_epi=45.9233274286):
         ## Returns: Dict {}
 
         # PREDICTED VALUES:
@@ -78,17 +78,17 @@ class Get_Paramters:
             'var_est': 'var_est'}
 
         # - Radius of the body used:
-        # PRIOR['radius'] = 3389.5 # Mars
-        PRIOR['radius'] = 6371 # Earth
+        PRIOR['radius'] = 3389.5 # Mars
+        # PRIOR['radius'] = 6371 # Earth
 
         # -Receiver
-        PRIOR['la_r'] = 40  # Latitude -90 <> 90
-        PRIOR['lo_r'] = 20  # Longitude -180 <> 180
+        PRIOR['la_r'] = 4.5 # Latitude -90 <> 90
+        PRIOR['lo_r'] = 136 # Longitude -180 <> 180
         PRIOR['network'] = "7J"  # Network
         PRIOR['station'] = "SYNT1"  # Station
 
         # -Source
-        PRIOR['M0'] = 1E15
+        PRIOR['M0'] = 1E17
         PRIOR['components'] = ["Z", "R", "T"]
 
         # -filter
@@ -106,11 +106,12 @@ class Get_Paramters:
 
         # Parameters for velocity model
         # PRIOR['VELOC'] = 'syngine://iasp91_2s'
-        PRIOR['VELOC'] = "/home/nienke/Documents/Applied_geophysics/Thesis/anaconda/Database/10s_PREM"
-        PRIOR['VELOC_taup'] = 'iasp91'
+        PRIOR['VELOC'] = 'http://instaseis.ethz.ch/marssynthetics/C30VH-BFT13-1s'
+        # PRIOR['VELOC'] = "/home/nienke/Documents/Applied_geophysics/Thesis/anaconda/Database/10s_PREM"
+        PRIOR['VELOC_taup'] = 'EH45TcoldCrust1b.npz'#'iasp91'
 
         # Model used to add noise in seismogram:
-        PRIOR['noise_model'] ='Tcompact' #'STS2' #
+        PRIOR['noise_model'] ='STS2' # 'Tcompact' #
 
         # Sample / spread ranges for the different parameters
         PRIOR['strike']['range_min'] = 0
@@ -130,7 +131,7 @@ class Get_Paramters:
         PRIOR['epi']['range_max'] = estimated_epi + 10
         PRIOR['epi']['spread'] = 1
 
-        PRIOR['sample_number'] = 100000
+        PRIOR['sample_number'] = 10000
         PRIOR['var_est'] = 0.05 # Variance estimate 5% off the observed data
 
         return PRIOR
@@ -158,7 +159,7 @@ class Get_Paramters:
 
         # Source parameters
         PARAMETERS['la_s'] = 10
-        PARAMETERS['lo_s'] = 12
+        PARAMETERS['lo_s'] = 90
 
         PARAMETERS['depth_s'] = 10000  # [m]
         PARAMETERS['strike'] = 79

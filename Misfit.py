@@ -87,19 +87,22 @@ class Misfit:
             s_syn_shift = self.shift(s_syn[i].data,time_shift[i])
             s_obs_shift = self.shift(s_obs[i].data,time_shift[i])
 
-            norm_syn = np.sqrt(np.sum((s_syn_shift ** 2) * dt))
-            norm_obs = np.sqrt(np.sum((s_obs_shift ** 2) * dt))
+            norm_syn_old = np.sqrt(np.sum((s_syn_shift ** 2) * dt))
+            norm_syn = np.linalg.norm(s_syn_shift)
+            norm_obs_old= np.sqrt(np.sum((s_obs_shift ** 2) * dt))
+            norm_obs = np.linalg.norm(s_obs_shift)
             # CC = max_cc
-            CC = (s_corr_max) / (norm_syn * norm_obs)  # Cross-Correlation
-            D = 1 - CC  # Decorrelation
-            misfit = np.append(misfit,((CC - 0.95) ** 2) / (2 * (0.1) ** 2))
+            CC_s = (s_corr_max) / (norm_syn * norm_obs)  # Cross-Correlation
+            D_s = 1 - CC_s  # Decorrelation
+            misfit = np.append(misfit,((CC_s - 1) ** 2) / (2 * (0.1) ** 2)+np.abs(time_shift[i]))
+            # misfit = np.append(misfit,((CC - 0.95) ** 2) / (2 * (0.1) ** 2))
 
             # plt.plot(s_syn_shift,label='s_syn_shifted')
             # plt.plot(s_obs_shift,label = 's_obs_shifted')
             # plt.plot(s_syn[i],label = 's_syn')
             # plt.plot(s_obs[i],label = 's_obs')
             # plt.legend()
-            # # plt.show()
+            # plt.show()
             # plt.close()
         # P- correlation
         for i in range(len(p_obs)):
@@ -112,19 +115,22 @@ class Misfit:
             p_syn_shift = self.shift(p_syn[i].data,time_shift[i+len(s_obs)])
             p_obs_shift = self.shift(p_obs[i].data,time_shift[i+len(s_obs)])
 
-            norm_syn = np.sqrt(np.sum((p_syn_shift ** 2) * dt))
-            norm_obs = np.sqrt(np.sum((p_obs_shift ** 2) * dt))
+            norm_syn_old = np.sqrt(np.sum((p_syn_shift ** 2) * dt))
+            norm_syn = np.linalg.norm(p_syn_shift)
+            norm_obs_old = np.sqrt(np.sum((p_obs_shift ** 2) * dt))
+            norm_obs = np.linalg.norm(p_obs_shift)
             # CC = max_cc
-            CC = (p_corr_max) / (norm_syn * norm_obs)  # Cross-Correlation
-            D = 1 - CC  # Decorrelation
-            misfit = np.append(misfit,((CC - 0.95) ** 2) / (2 * (0.1) ** 2))
+            CC_p = (p_corr_max) / (norm_syn * norm_obs)  # Cross-Correlation
+            D_p = 1 - CC_p  # Decorrelation
+            # misfit = np.append(misfit,((CC - 0.95) ** 2) / (2 * (0.1) ** 2))
+            misfit = np.append(misfit,((CC_p- 1) ** 2) / (2 * (0.1) ** 2)+np.abs(time_shift[i+len(s_obs)]))
 
             # plt.plot(p_syn_shift,label = 'p_syn_shifted')
             # plt.plot(p_obs_shift,label = 'p_obs_shifted')
             # plt.plot(p_syn[i],label    = 'p_syn')
             # plt.plot(p_obs[i],label    = 'p_obs')
             # plt.legend()
-            # # plt.show()
+            # plt.show()
             # plt.close()
         sum_misfit = np.sum(misfit)
         return sum_misfit, time_shift

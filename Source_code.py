@@ -40,11 +40,11 @@ class Source_code:
             P_trace = Trace.slice(trace, start_time_p, end_time_p)
             S_trace = Trace.slice(trace, start_time_s, end_time_s)
             stream_add = P_trace.__add__(S_trace, fill_value=0, sanity_checks=True)
-            zero_trace = Trace(np.zeros(npts),
+            zero_trace = Trace(np.zeros(npts,dtype='f'),
                         header={"starttime": start_time_p, 'delta': trace.meta.delta, "station": trace.meta.station,
                                 "network": trace.meta.network, "location": trace.meta.location,
                                 "channel": trace.meta.channel, "instaseis": trace.meta.instaseis})
-            if trace.meta.channel == u'LXT':
+            if 'T' in trace.meta.channel:
                 total_trace = zero_trace.__add__(S_trace, method=0, interpolation_samples=0, fill_value=S_trace.data,
                                       sanity_checks=True)
                 total_s_trace= total_trace.copy()
