@@ -4,6 +4,7 @@ import numpy as np
 import os
 import seaborn as sns
 import obspy
+from matplotlib.dates import date2num
 # import mplstereonet
 import yaml
 import itertools
@@ -105,7 +106,7 @@ class Plots:
         plt.grid()
         plt.show()
 
-    def marginal_2D(self, data_x, name_x, data_y, name_y, amount_bins, directory, filename):
+    def marginal_2D(self, data_x, name_x, data_y, name_y, amount_bins, directory, filename,true_time):
         params = {'legend.fontsize': 'x-large',
                   'figure.figsize': (15, 15),
                   'axes.labelsize': 25,
@@ -119,8 +120,20 @@ class Plots:
         # plt.axis('equal')
         # plt.xlim([-20,40])
         # plt.ylim([10,70])
-        plt.xlabel('%s' % name_x)
-        plt.ylabel('%s' % name_y)
+        if name_x == 'Time':
+            or_time=obspy.UTCDateTime(true_time[0], true_time[1], true_time[2], true_time[3], true_time[4], true_time[5])
+            plt.xlabel(or_time.strftime('%Y-%m-%dT%H:%M:%S + sec'))
+            plt.ylabel('%s' % name_y)
+        elif name_y == 'Time':
+
+            or_time=obspy.UTCDateTime(true_time[0], true_time[1], true_time[2], true_time[3], true_time[4], true_time[5])
+            plt.ylabel(or_time.strftime('%Y-%m-%dT%H:%M:%S + sec'))
+            plt.xlabel('%s' % name_x)
+        else:
+            plt.ylabel('%s' % name_y)
+            plt.xlabel('%s' % name_x)
+
+
         plt.title('2D posterior marginal', fontsize=25)
         cb = plt.colorbar()
         cb.set_label('Probability')
@@ -132,7 +145,7 @@ class Plots:
         # plt.show()
         plt.close()
 
-    def marginal_1D(self, data, name, amount_bins, directory, filename):
+    def marginal_1D(self, data, name, amount_bins, directory, filename, true_time):
         params = {'legend.fontsize': 'x-large',
                   'figure.figsize': (15, 15),
                   'axes.labelsize': 25,
@@ -142,7 +155,11 @@ class Plots:
         pylab.rcParams.update(params)
         q = np.histogram(data, bins=amount_bins)
         plt.hist(data, bins=amount_bins)
-        plt.xlabel('%s' % name)
+        if name == 'Time':
+            or_time=obspy.UTCDateTime(true_time[0], true_time[1], true_time[2], true_time[3], true_time[4], true_time[5])
+            plt.xlabel(or_time.strftime('%Y-%m-%dT%H:%M:%S + sec'))
+        else:
+            plt.xlabel('%s' % name)
         plt.ylabel('Frequency')
         if name == 'Time':
             labels = np.ones_like(data)
@@ -157,14 +174,24 @@ class Plots:
         # plt.show()
         plt.close()
 
-    def Kernel_density(self, data, data_x, data_y, parameters, directory, savename):
+    def Kernel_density(self, data, data_x, data_y, directory, savename):
         dir = directory + '/Kernel_density'
         if not os.path.exists(dir):
             os.makedirs(dir)
         # dir_path = dir + '/%s.pdf' %savename
-        dir_path = dir + '/%s.pdf' % savename
-        # dir_path = dir + '/Real_%s_%.2f_Real_%s_%.2f.pdf' % (data_x,parameters['%s'%data_x],data_y,parameters['%s'%data_y])
-        sns.jointplot(x=data_x, y=data_y, data=data, kind="kde")
+        dir_path = dir + '/%s_%s_%s.pdf' % (savename, data_x,data_y)
+        h= sns.jointplot(x=data_x, y=data_y, data=data, kind="kde")
+        plt.tight_layout()
+        plt.savefig(dir_path)
+        plt.close()
+
+    def hist(self, data, data_x, data_y, directory, savename):
+        dir = directory + '/Historgrams'
+        if not os.path.exists(dir):
+            os.makedirs(dir)
+        dir_path = dir + '/%s_%s_%s.pdf' % (savename, data_x,data_y)
+        h= sns.jointplot(x=data_x, y=data_y, data=data, kind="hex")
+        plt.tight_layout()
         plt.savefig(dir_path)
         plt.close()
 
@@ -176,6 +203,7 @@ class Plots:
         g = sns.PairGrid(data=data)
         g.map_diag(sns.kdeplot)
         g.map_offdiag(sns.kdeplot, cmap="Blues_d", n_levels=6)
+        plt.tight_layout()
         plt.savefig(dir_path)
         plt.close()
 
@@ -191,43 +219,31 @@ class Plots:
         dir = directory + '/sampler'
         if not os.path.exists(dir):
             os.makedirs(dir)
-        dir_path = dir + '/%s.pdf' % savename
+
 
         burnin = 980
         data = np.transpose(np.loadtxt(filepath, delimiter=','))
 
-        data_dict = {'Strike': data[0],
-                     'Dip': data[1],
-                     'Rake': data[2]}
+        data_dict = {'epicentral_distance':data[0],
+                     'depth':data[1],
+                     'Strike': data[4],
+                     'Dip': data[5],
+                     'Rake': data[6]}
         sns.set_style("darkgrid")
-        plt.scatter(data_dict['Strike'][burnin], data_dict['Rake'][burnin], marker='^',
-                    label="Start_point")
-        plt.plot(data_dict['Strike'][burnin:], data_dict['Rake'][burnin:], linestyle=':',
-                 label="sample_lag")
-        plt.scatter(data_dict['Strike'][burnin + 1:], data_dict['Rake'][burnin + 1:], label="Sample")
-        plt.xlabel("Strike")
-        plt.ylabel("Rake")
-        plt.legend()
-        plt.savefig(dir_path)
+        for i in itertools.combinations(data_dict, 2):
+            plt.scatter(data_dict[i[0]][burnin], data_dict[i[1]][burnin], marker='^',
+                        label="Start_point")
+            plt.plot(data_dict[i[0]][burnin:], data_dict[i[1]][burnin:], linestyle=':',
+                     label="sample_lag")
+            plt.scatter(data_dict[i[0]][burnin + 1:], data_dict[i[1]][burnin + 1:], label="Sample")
+            plt.xlabel(i[0])
+            plt.ylabel(i[1])
+            plt.legend()
+            dir_path = dir + '/%s_%s_%s.pdf' % (savename,i[0],i[1])
+            plt.savefig(dir_path)
+            plt.close()
 
-
-        # data = np.transpose(np.loadtxt(filepath, delimiter=','))
-        # data_dict = {'Epicentral_distance': data[0],
-        #              'Depth': data[1],
-        #              'Time': data[2]}
-
-        # sns.set_style("darkgrid")
-        # plt.scatter(data_dict['Epicentral_distance'][burnin], data_dict['Depth'][burnin], marker='^',
-        #             label="Start_point")
-        # plt.plot(data_dict['Epicentral_distance'][burnin:], data_dict['Depth'][burnin:], linestyle=':',
-        #          label="sample_lag")
-        # plt.scatter(data_dict['Epicentral_distance'][burnin + 1:], data_dict['Depth'][burnin + 1:], label="Sample")
-        # plt.xlabel("Epicentral Distance")
-        # plt.ylabel("Depth")
-        # plt.legend()
-        # plt.savefig(dir_path)
-
-    def plot_seismogram_during_MH(self,ax1,ax2,ax3,d_syn,traces,savepath,final_plot=False):
+    def plot_seismogram_during_MH(self,ax,data,savepath,final_plot=False):
         params = {'legend.fontsize': 'x-large',
                   'figure.figsize': (20, 15),
                   'axes.labelsize': 25,
@@ -236,29 +252,20 @@ class Plots:
                   'ytick.labelsize': 25}
         pylab.rcParams.update(params)
         if final_plot == True:
-            traces[0].data[traces[0].data == 0] = np.nan
-            traces[1].data[traces[1].data == 0] = np.nan
-            traces[2].data[traces[2].data == 0] = np.nan
-
-            ax1.plot(traces[0], linestyle=':', label="Observed data")
-            ax2.plot(traces[1], linestyle=':')
-            ax3.plot(traces[2], linestyle=':')
-            ax1.legend()
+            ax.plot(data, linestyle=':', label="Observed data")
+            ax.legend()
+            plt.tight_layout()
             # plt.plot(self.d_obs, ":")
             plt.xlabel('Time [s]')
-            plt.show()
-            # plt.savefig(savepath.replace('.txt','.pdf') )
+            # plt.show()
+            plt.savefig(savepath.replace('.txt','.pdf') )
             plt.close()
 
         else:
-            # d_syn[d_syn == 0] = np.nan
-            trace_z = d_syn[0:len(traces[0])]
-            trace_r = d_syn[len(traces[0]):len(traces[0]) * 2]
-            trace_t = d_syn[len(traces[0]) * 2:len(traces[0]) * 3]
-            ax1.plot(trace_z, alpha=0.2)
-            ax2.plot(trace_r, alpha=0.2)
-            ax3.plot(trace_t, alpha=0.2)
-            plt.show()
+            ax.plot(data, alpha=0.2)
+
+
+
 
 
 

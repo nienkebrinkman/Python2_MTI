@@ -52,16 +52,16 @@ class MCMC_stream:
     def model_samples(self, epi_old=None, depth_old=None):
         if epi_old == None or depth_old == None:
             epi_sample = np.random.uniform(self.prior['epi']['range_min'], self.prior['epi']['range_max'])
-            depth_sample =np.random.uniform(self.prior['depth']['range_min'], self.prior['depth']['range_max'])
+            depth_sample =np.around(np.random.uniform(self.prior['depth']['range_min'], self.prior['depth']['range_max']),decimals=1)
         else:
             epi_sample = np.random.normal(epi_old, self.prior['epi']['spread'])
-            depth_sample = np.random.normal(depth_old, self.prior['depth']['spread'])
+            depth_sample = np.around(np.random.normal(depth_old, self.prior['depth']['spread']),decimals=1)
         return epi_sample, depth_sample
 
     def model_samples_sdr(self, strike_old=None, dip_old=None, rake_old=None):
         if strike_old == None or dip_old == None or rake_old == None:
-            strike = np.random.uniform(self.prior['strike']['range_min'], self.prior['strike']['range_max'])
-            dip = np.random.uniform(self.prior['dip']['range_min'], self.prior['dip']['range_max'])
+            strike = np.random.uniform(0, 2 * np.pi, 1)  # Phi
+            dip = np.arccos(1 - 2 * np.random.random_sample((1,))) # Theta
             rake = np.random.uniform(self.prior['rake']['range_min'], self.prior['rake']['range_max'])
         else:
             strike = np.random.normal(strike_old, self.prior['strike']['spread'])
