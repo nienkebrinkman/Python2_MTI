@@ -60,14 +60,53 @@ class MCMC_stream:
 
     def model_samples_sdr(self, strike_old=None, dip_old=None, rake_old=None):
         if strike_old == None or dip_old == None or rake_old == None:
-            strike = np.random.uniform(0, 2 * np.pi, 1)  # Phi
-            dip = np.arccos(1 - 2 * np.random.random_sample((1,))) # Theta
-            rake = np.random.uniform(self.prior['rake']['range_min'], self.prior['rake']['range_max'])
+            R_strike = np.rad2deg(np.random.uniform(0, 2 * np.pi, 1))  # Phi [Degree]
+            R_rake = np.rad2deg(np.arccos(1 - 2 * np.random.random_sample((1,))))  # Lambda
+            dip = np.random.uniform(self.prior['dip']['range_min'], self.prior['dip']['range_max'])  # Theta
+            return R_strike[0], dip, R_rake[0]
         else:
-            strike = np.random.normal(strike_old, self.prior['strike']['spread'])
+            rake_rad = np.deg2rad(rake_old)
+            strike_rad = np.deg2rad(strike_old)
+
+            # X,Y,Z coordinate of the Northpole:
+            north_coor = np.array([0, 0, 1])
+
+            # X,Y,Z coordinates of the old sample:
+            old_coor = np.array([np.sin(rake_rad) * np.cos(strike_rad), np.sin(rake_rad) * np.sin(strike_rad),
+                                 np.cos(rake_rad)])
+
+            # Rotation Axis of from Northpole to Old_sample
+            R = np.cross(north_coor, old_coor)
+            R_norm = R / (np.sqrt(np.sum(np.square(R), axis=0)))
+
+            # New proposal of rake with old rake as mean and the spread as standard deviation
+            random_rake = np.abs(np.random.normal(0, self.prior['rake']['spread']))
+            rake = np.deg2rad(random_rake)
+
+            # Strike will be choosen from a point on a circle all with epicentral radius of: rake
+            random_strike = np.random.choice(
+                np.around(np.linspace(self.prior['strike']['range_min'], self.prior['strike']['range_max'], 360),
+                          decimals=1))
+            strike = np.deg2rad(random_strike)
+
+            # X,Y,Z coordinates of the new_sample, BUT looking from the northpole (SO STILL NEEDS ROTATION)
+            new_coor = np.array([np.sin(rake) * np.cos(strike), np.sin(rake) * np.sin(strike), np.cos(rake)])
+
+            # X,Y,Z coordinates with rotation included --> using: Rodrigues' Rotation Formula
+            beta = rake_rad
+            R_new_coor = np.cos(beta) * new_coor + np.sin(beta) * (np.cross(R_norm, new_coor)) + (np.inner(R_norm,
+                                                                                                          new_coor)) * (
+                                                                                                     1 - np.cos(
+                                                                                                         beta)) * R_norm
+
+            R_strike = np.rad2deg(np.arctan2(R_new_coor[1], R_new_coor[0]))
+            R_rake = np.rad2deg(np.arctan2(np.sqrt(R_new_coor[0] ** 2 + R_new_coor[1] ** 2), R_new_coor[2]))
+            # R_rake = np.rad2deg(np.arctan((np.sqrt(R_new_coor[0] ** 2 + R_new_coor[1] ** 2) / R_new_coor[2])))
+
+            # Determine from a normal distribution a new dip: mean = old dip and SD = spread
             dip = np.random.normal(dip_old, self.prior['dip']['spread'])
-            rake = np.random.normal(rake_old, self.prior['rake']['spread'])
-        return 79,50,20
+            return R_strike, dip, R_rake
+
 
     def G_function(self, epi, depth, moment_old=None):
         if self.sdr == True:
@@ -78,14 +117,8 @@ class MCMC_stream:
                 strike, dip, rake = self.model_samples_sdr()
             else:
                 strike, dip, rake = self.model_samples_sdr(moment_old[0], moment_old[1], moment_old[2])
-                if strike < self.prior['strike']['range_min'] or strike > self.prior['strike']['range_max'] or dip < \
-                        self.prior['dip']['range_min'] or dip > self.prior['dip']['range_max'] or rake < \
-                        self.prior['rake']['range_min'] or rake > self.prior['rake']['range_max']:
-                    total_syn = None
-                    s_syn = None
-                    p_syn = None
-                    moment = None
-                    return total_syn,p_syn, s_syn, moment
+                if dip < self.prior['dip']['range_min'] or dip > self.prior['dip']['range_max']:
+                    return None,None,None,None
             d_syn, traces_syn, sources = self.seis.get_seis_manual(la_s=dict['lat2'], lo_s=dict['lon2'], depth=depth,
                                                                    strike=strike, dip=dip, rake=rake,
                                                                    time=self.time_at_rec, sdr=self.sdr)

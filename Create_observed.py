@@ -48,11 +48,16 @@ class Create_observed:
         receiver = self.get_receiver()
         traces = self.db.get_seismograms(source=source, receiver=receiver, components=self.prior['components'],
                                          kind=self.prior['kind'])
+        traces.traces[0].data = np.float64(traces.traces[0].data)
+        traces.traces[1].data = np.float64(traces.traces[1].data)
+        traces.traces[2].data = np.float64(traces.traces[2].data)
+
         if noise_model == True:
             seismogram_noise.add_noise(traces, model=self.prior['noise_model'])
         seismogram = np.array([])
         for trace in traces.traces:
             seismogram = np.append(seismogram, trace)
+
         return seismogram, traces, source
 
     def get_P(self, epi, depth_m):
@@ -107,7 +112,7 @@ class Create_observed:
             P_trace = Trace.slice(trace, start_time_p, end_time_p)
             S_trace = Trace.slice(trace, start_time_s, end_time_s)
             stream_add = P_trace.__add__(S_trace, fill_value=0, sanity_checks=True)
-            zero_trace = Trace(np.zeros(npts, dtype='f'),
+            zero_trace = Trace(np.zeros(npts),
                         header={"starttime": start_time_p, 'delta': trace.meta.delta, "station": trace.meta.station,
                                 "network": trace.meta.network, "location": trace.meta.location,
                                 "channel": trace.meta.channel, "instaseis": trace.meta.instaseis})

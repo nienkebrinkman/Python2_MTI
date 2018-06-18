@@ -6,18 +6,7 @@ from obspy.core.stream import Stream
 
 from Get_Parameters import Get_Paramters
 from Source_code import Source_code
-#
-#
-# def main():
-#     get_parameters = Get_Paramters()
-#     PARAMETERS = get_parameters.get_unkown()
-#     PRIOR = get_parameters.get_prior()
-#     PRIOR['az'] = 12.0064880807
-#
-#     db = instaseis.open_db(PRIOR['VELOC'])
-#
-#     green = Green_functions(PRIOR, db)
-#     G = green.get(PARAMETERS['origin_time'], PARAMETERS['epi'], PARAMETERS['depth_s'], 300)
+
 
 
 class Green_functions:

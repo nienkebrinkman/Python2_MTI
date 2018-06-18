@@ -33,6 +33,9 @@ class Seismogram:
         receiver = self.get_receiver()
         traces = self.db.get_seismograms(source=source, receiver=receiver, components=self.prior['components'],
                                          kind=self.prior['kind'])
+        traces.traces[0].data = np.float64(traces.traces[0].data)
+        traces.traces[1].data = np.float64(traces.traces[1].data)
+        traces.traces[2].data = np.float64(traces.traces[2].data)
         seismogram = np.array([])
         for trace in traces.traces:
             seismogram = np.append(seismogram, trace)

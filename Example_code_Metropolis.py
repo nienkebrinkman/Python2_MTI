@@ -16,26 +16,29 @@ PARAMETERS = get_parameters.get_unkown()
 PRIOR = get_parameters.get_prior()
 VALUES = get_parameters.specifications()
 
-
 ## DISCUSS THIS!!!!
 PRIOR['az'] = PARAMETERS['az']
 PRIOR['baz'] = PARAMETERS['baz']
 
 # Initiate the databases from instaseis:
 db = instaseis.open_db(PRIOR['VELOC'])
-create = Create_observed(PRIOR,PARAMETERS,db)
+create = Create_observed(PRIOR, PARAMETERS, db)
 
-d_obs, traces, source = create.get_seis_automatic(prior=PRIOR,noise_model=VALUES['noise'],sdr=VALUES['sdr'])
-traces_obs, p_obs, s_obs = create.get_window_obspy(traces,PARAMETERS['epi'],PARAMETERS['depth_s'],PARAMETERS['origin_time'],VALUES['npts'])
-time_at_receiver = create.get_receiver_time(PARAMETERS['epi'],PARAMETERS['depth_s'],traces)
-time_between_windows = create.time_between_windows(PARAMETERS['epi'],PARAMETERS['depth_s'],traces[0].meta.delta)
+d_obs, traces, source = create.get_seis_automatic(prior=PRIOR, noise_model=VALUES['noise'], sdr=VALUES['sdr'])
+traces_obs, p_obs, s_obs = create.get_window_obspy(traces, PARAMETERS['epi'], PARAMETERS['depth_s'],
+                                                   PARAMETERS['origin_time'], VALUES['npts'])
+time_at_receiver = create.get_receiver_time(PARAMETERS['epi'], PARAMETERS['depth_s'], traces)
+time_between_windows = create.time_between_windows(PARAMETERS['epi'], PARAMETERS['depth_s'], traces[0].meta.delta)
 # traces_obs.plot()
 
-#----------------------------------------------------------------------------------------------------------------------#
+# ----------------------------------------------------------------------------------------------------------------------#
 
 # Now we can Run a Monte Carlo algorthm:
-M_algorithm = MCMC_stream(traces_obs,p_obs,s_obs, PRIOR,db,VALUES,time_at_receiver)
+M_algorithm = MCMC_stream(traces_obs, p_obs, s_obs, PRIOR, db, VALUES, time_at_receiver)
 M_algorithm.start_MCMC(savepath=VALUES['directory'] + '/mcmctestttt.txt')
 
+# Run in Parallel is also possible
+# comment: M_algorithm.start_MCMC(savepath=VALUES['directory'] + '/mcmctestttt.txt'
+# De-comment the following:
 
-
+# M_algorithm.run_parallel()

@@ -22,14 +22,15 @@ def main():
     get_parameters = Get_Paramters()
     PRIOR = get_parameters.get_prior()
     VALUES = get_parameters.specifications()
+    PARAMETERS = get_parameters.get_unkown()
 
     ## DISCUSS THIS!!!!
-    PRIOR['az'] = 12.0064880807
-    PRIOR['baz'] = 195.511305403
+    PRIOR['az'] = PARAMETERS['az']
+    PRIOR['baz'] = PARAMETERS['baz']
 
     ## Post - Processing [processing the results from inversion]
     result = Post_processing()
-    file_path , savename = result.combine_parallel(dir_of_txt_files=VALUES['directory']+ '/proc_sdr',savename='new_veloc')
+    file_path , savename = result.combine_parallel(dir_of_txt_files=VALUES['directory']+ '/proc_sdr',savename='cc_obspy_mcmc')
     result.Seaborn_plots(filepath=file_path,savename=savename,directory=VALUES['directory'])
     # result.event_plot(file_path)
     # result.get_seismogram_plots(sampler['directory'])
@@ -51,13 +52,14 @@ class Post_processing:
 
             with open(fname) as infile:
                 if i == 0:
-                    dat = np.genfromtxt(infile, delimiter=',',skip_footer=1)
+                    # dat = np.genfromtxt(infile, delimiter=',',skip_footer=1)
+                    dat = np.genfromtxt(infile, delimiter=',',skip_header=34,skip_footer=1)
                     # par = open(fname, "r").readlines()[:34]
                     # parameters = self.write_to_dict(par)
 
                 else:
-                    # dat = np.vstack((dat, np.genfromtxt(infile, delimiter=',', skip_header=34, skip_footer=1)))
-                    dat = np.vstack((dat, np.genfromtxt(infile, delimiter=',',skip_footer=1)))
+                    dat = np.vstack((dat, np.genfromtxt(infile, delimiter=',', skip_header=34, skip_footer=1)))
+                    # dat = np.vstack((dat, np.genfromtxt(infile, delimiter=',',skip_footer=1)))
             # data_file = {'data': dat, 'parameters': parameters}
             data_file = {'data': dat}
             with open(save_path, 'w') as yaml_file:
@@ -192,7 +194,7 @@ class Post_processing:
             df_select = df[['Epicentral_distance', 'Depth', 'Misfit']]
         else:
             df = pd.DataFrame(data,
-                              columns=["Epicentral_distance", "Depth","Misfit", "i","j"])
+                              columns=["Epicentral_distance", "Depth","Misfit","i"])
             df_select = df[
                 ['Epicentral_distance', 'Depth', 'Misfit']]
             # df = pd.DataFrame(data,columns=['Epicentral_distance', 'Depth', 'Misfit', 'I'])

@@ -106,7 +106,8 @@ class Get_Paramters:
 
         # Parameters for velocity model
         # PRIOR['VELOC'] = 'syngine://iasp91_2s'
-        PRIOR['VELOC'] = 'http://instaseis.ethz.ch/marssynthetics/C30VH-BFT13-1s'
+        # PRIOR['VELOC'] = 'http://instaseis.ethz.ch/marssynthetics/C30VH-BFT13-1s'
+        PRIOR['VELOC'] = 'http://instaseis.ethz.ch/blindtest_1s/EH45TcoldCrust1b_Q100_1s'
         # PRIOR['VELOC'] = "/home/nienke/Documents/Applied_geophysics/Thesis/anaconda/Database/10s_PREM"
         PRIOR['VELOC_taup'] = 'EH45TcoldCrust1b.npz'#'iasp91'
 
@@ -120,18 +121,18 @@ class Get_Paramters:
         PRIOR['dip']['range_min'] = 0
         PRIOR['dip']['range_max'] = 90
         PRIOR['dip']['spread'] = 1
-        PRIOR['rake']['range_min'] = -180
+        PRIOR['rake']['range_min'] = 0
         PRIOR['rake']['range_max'] = 180
-        PRIOR['rake']['spread'] = 1
+        PRIOR['rake']['spread'] = 2
 
         PRIOR['depth']['range_min'] = 0
         PRIOR['depth']['range_max'] = 50000
         PRIOR['depth']['spread'] = 100
-        PRIOR['epi']['range_min'] = estimated_epi - 10
-        PRIOR['epi']['range_max'] = estimated_epi + 10
+        PRIOR['epi']['range_min'] = estimated_epi - 5
+        PRIOR['epi']['range_max'] = estimated_epi + 5
         PRIOR['epi']['spread'] = 1
 
-        PRIOR['sample_number'] = 10000
+        PRIOR['sample_number'] = 30000
         PRIOR['var_est'] = 0.05 # Variance estimate 5% off the observed data
 
         return PRIOR
