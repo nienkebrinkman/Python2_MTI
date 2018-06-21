@@ -5,17 +5,20 @@ import numpy as np
 import geographiclib.geodesic as geo
 import seaborn as sns
 import matplotlib.pylab as plt
-import obspy
+import instaseis
 
+from Create_observed import Create_observed
+from Get_Parameters import Get_Paramters
 from Source_code import Source_code
 from Seismogram import Seismogram
 from Green_functions import Green_functions
 from Inversion_problems import Inversion_problem
 from Misfit import Misfit
-
+from Surface_waves import Surface_waves
 
 class MCMC_stream:
-    def __init__(self, total_traces_obs, P_traces_obs , S_traces_obs, PRIOR, db, specification_values, time_at_receiver):
+    def __init__(self, R_env_obs,L_env_obs, total_traces_obs, P_traces_obs, S_traces_obs, PRIOR, db, specification_values,
+                 time_at_receiver):
         # specification values is a dict of the following, See Get_Parameters.py to see the form of values:
         self.sdr = specification_values['sdr']
         self.plot_modus = specification_values['plot_modus']
@@ -26,6 +29,8 @@ class MCMC_stream:
         self.noise = specification_values['noise']
         self.npts = specification_values['npts']
 
+        self.R_env_obs = R_env_obs
+        self.L_env_obs = L_env_obs
         self.total_tr_obs = total_traces_obs
         self.s_tr_obs = S_traces_obs
         self.p_tr_obs = P_traces_obs
@@ -48,14 +53,16 @@ class MCMC_stream:
         self.Green_function = Green_functions(self.prior, self.db)
         self.inv = Inversion_problem(self.prior)
         self.misfit = Misfit(specification_values['directory'])
+        self.SW = Surface_waves(self.prior)
 
     def model_samples(self, epi_old=None, depth_old=None):
         if epi_old == None or depth_old == None:
             epi_sample = np.random.uniform(self.prior['epi']['range_min'], self.prior['epi']['range_max'])
-            depth_sample =np.around(np.random.uniform(self.prior['depth']['range_min'], self.prior['depth']['range_max']),decimals=1)
+            depth_sample = np.around(
+                np.random.uniform(self.prior['depth']['range_min'], self.prior['depth']['range_max']), decimals=1)
         else:
             epi_sample = np.random.normal(epi_old, self.prior['epi']['spread'])
-            depth_sample = np.around(np.random.normal(depth_old, self.prior['depth']['spread']),decimals=1)
+            depth_sample = np.around(np.random.normal(depth_old, self.prior['depth']['spread']), decimals=1)
         return epi_sample, depth_sample
 
     def model_samples_sdr(self, strike_old=None, dip_old=None, rake_old=None):
@@ -81,12 +88,14 @@ class MCMC_stream:
 
             # New proposal of rake with old rake as mean and the spread as standard deviation
             random_rake = np.abs(np.random.normal(0, self.prior['rake']['spread']))
+            # random_rake = 30.0
             rake = np.deg2rad(random_rake)
 
             # Strike will be choosen from a point on a circle all with epicentral radius of: rake
             random_strike = np.random.choice(
                 np.around(np.linspace(self.prior['strike']['range_min'], self.prior['strike']['range_max'], 360),
                           decimals=1))
+            # random_strike=270.0
             strike = np.deg2rad(random_strike)
 
             # X,Y,Z coordinates of the new_sample, BUT looking from the northpole (SO STILL NEEDS ROTATION)
@@ -95,11 +104,13 @@ class MCMC_stream:
             # X,Y,Z coordinates with rotation included --> using: Rodrigues' Rotation Formula
             beta = rake_rad
             R_new_coor = np.cos(beta) * new_coor + np.sin(beta) * (np.cross(R_norm, new_coor)) + (np.inner(R_norm,
-                                                                                                          new_coor)) * (
+                                                                                                           new_coor)) * (
                                                                                                      1 - np.cos(
                                                                                                          beta)) * R_norm
 
             R_strike = np.rad2deg(np.arctan2(R_new_coor[1], R_new_coor[0]))
+            if R_strike < 0:
+                R_strike = 360 + R_strike
             R_rake = np.rad2deg(np.arctan2(np.sqrt(R_new_coor[0] ** 2 + R_new_coor[1] ** 2), R_new_coor[2]))
             # R_rake = np.rad2deg(np.arctan((np.sqrt(R_new_coor[0] ** 2 + R_new_coor[1] ** 2) / R_new_coor[2])))
 
@@ -107,33 +118,41 @@ class MCMC_stream:
             dip = np.random.normal(dip_old, self.prior['dip']['spread'])
             return R_strike, dip, R_rake
 
+        return R_strike,dip,R_rake
 
     def G_function(self, epi, depth, moment_old=None):
         if self.sdr == True:
             dict = geo.Geodesic(a=self.prior['radius'], f=0).ArcDirect(lat1=self.prior['la_r'], lon1=self.prior['lo_r'],
-                                                         azi1=self.prior['baz'],
-                                                         a12=epi, outmask=1929)
+                                                                       azi1=self.prior['baz'],
+                                                                       a12=epi, outmask=1929)
             if moment_old is None:
                 strike, dip, rake = self.model_samples_sdr()
             else:
                 strike, dip, rake = self.model_samples_sdr(moment_old[0], moment_old[1], moment_old[2])
                 if dip < self.prior['dip']['range_min'] or dip > self.prior['dip']['range_max']:
-                    return None,None,None,None
+                    return None,None,None,None,None,None
             d_syn, traces_syn, sources = self.seis.get_seis_manual(la_s=dict['lat2'], lo_s=dict['lon2'], depth=depth,
                                                                    strike=strike, dip=dip, rake=rake,
                                                                    time=self.time_at_rec, sdr=self.sdr)
+            R_env_syn = self.SW.rayleigh_pick(Z_trace=traces_syn.traces[0], la_s=dict['lat2'], lo_s=dict['lon2'],
+                                              depth=depth, save_directory=self.directory, time_at_rec=self.time_at_rec,
+                                              npts=self.npts)
+            L_env_syn = self.SW.rayleigh_pick(Z_trace=traces_syn.traces[2], la_s=dict['lat2'], lo_s=dict['lon2'],
+                                              depth=depth, save_directory=self.directory, time_at_rec=self.time_at_rec,
+                                              npts=self.npts)
 
-            total_syn, p_syn, s_syn = self.window.get_window_obspy(traces_syn, epi, depth, self.time_at_rec,self.npts)
+            total_syn, p_syn, s_syn = self.window.get_window_obspy(traces_syn, epi, depth, self.time_at_rec, self.npts)
 
-            return total_syn,p_syn, s_syn, np.array([strike, dip, rake])
+            return R_env_syn, L_env_syn,total_syn, p_syn, s_syn, np.array([strike, dip, rake])
 
         else:
-            G_tot, G_z, G_r, G_t = self.Green_function.get(self.time_at_rec,epi, depth, self.npts)
+            G_tot, G_z, G_r, G_t = self.Green_function.get(self.time_at_rec, epi, depth, self.npts)
             moment = self.inv.Solve_damping_smoothing(self.d_obs, G_tot)
-            d_syn = np.matmul(G_tot,moment)
+            d_syn = np.matmul(G_tot, moment)
+            # TODO the right amount of return values need to be returned!!
             return d_syn, moment
 
-    def start_MCMC(self,savepath):
+    def start_MCMC(self, savepath):
         with open(savepath, 'w') as save_file:
             self.write_par(save_file)
             accepted = 0
@@ -143,25 +162,33 @@ class MCMC_stream:
                     print("proposal: %i, accepted: %i" % (i, accepted))
                     print("proposal: %i, rejected: %i" % (i, rejected))
 
-                if i ==0 or self.MCMC == 'MH':
-                    epi,depth = self.model_samples()
-                    total_syn, p_syn, s_syn, moment = self.G_function(epi, depth)
+                if i == 0 or self.MCMC == 'MH':
+                    epi, depth = self.model_samples()
+                    R_env_syn, L_env_syn, total_syn, p_syn, s_syn, moment = self.G_function(epi, depth)
                 else:
                     epi, depth = self.model_samples(epi_old, depth_old)
 
                     if epi < self.prior['epi']['range_min'] or epi > self.prior['epi']['range_max'] or depth < \
                             self.prior['depth']['range_min'] or depth > self.prior['depth']['range_max']:
                         continue
-                    total_syn, p_syn, s_syn, moment = self.G_function(epi, depth, moment_old)
+                    R_env_syn, L_env_syn, total_syn, p_syn, s_syn, moment = self.G_function(epi, depth, moment_old)
                     if p_syn is None or moment is None:
                         continue
 
                 if self.xi == 'L2':
-                    Xi_new, time_shift_new = self.misfit.L2_stream(self.p_tr_obs,p_syn,self.s_tr_obs,s_syn,self.time_at_rec,self.prior['var_est'])
+                    Xi_bw, time_shift_new = self.misfit.L2_stream(self.p_tr_obs, p_syn, self.s_tr_obs, s_syn,
+                                                                  self.time_at_rec, self.prior['var_est'])
+                    Xi_R = self.misfit.SW_L2(self.R_env_obs, R_env_syn, self.prior['var_est'])
+                    Xi_L = self.misfit.SW_L2(self.L_env_obs, L_env_syn, self.prior['var_est'])
+                    Xi_new = Xi_bw + Xi_R + Xi_L
                 elif self.xi == 'CC':
-                    Xi_new, time_shift_new = self.misfit.CC_stream(self.p_tr_obs,p_syn,self.s_tr_obs,s_syn,self.time_at_rec)
+                    Xi_bw, time_shift_new = self.misfit.CC_stream(self.p_tr_obs, p_syn, self.s_tr_obs, s_syn,
+                                                                  self.time_at_rec)
+                    Xi_R = self.misfit.SW_L2(self.R_env_obs, R_env_syn, self.prior['var_est'])
+                    Xi_L = self.misfit.SW_L2(self.L_env_obs, L_env_syn, self.prior['var_est'])
+                    Xi_new = Xi_bw + Xi_R + Xi_L
                 else:
-                  raise ValueError('misfit is not specified correctly, choose either: L2 or CC in string format')
+                    raise ValueError('misfit is not specified correctly, choose either: L2 or CC in string format')
 
                 if i == 0:
                     self.write_sample(save_file, epi, depth, Xi_new, moment)
@@ -268,8 +295,14 @@ class MCMC_stream:
         if not os.path.exists(dir_proc):
             os.makedirs(dir_proc)
         filepath_proc = dir_proc + '/file_proc_%i.txt' % rank
-        self.start_MCMC(filepath_proc)
+
+        try:
+            self.start_MCMC(filepath_proc)
+        except TypeError:
+            print ("TypeError in rank: %i" % rank)
+            self.start_MCMC(filepath_proc)
 
         comm.bcast()  # All the processor wait until they are all at this point
         if rank == 0:
             print ("The .txt files are saved in: %s" % dir_proc)
+
