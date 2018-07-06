@@ -106,7 +106,7 @@ class Plots:
         plt.grid()
         plt.show()
 
-    def marginal_2D(self, data_x, name_x, data_y, name_y, amount_bins, directory, filename,true_time):
+    def marginal_2D(self, data_x, name_x, data_y, name_y, amount_bins, directory, show):
         params = {'legend.fontsize': 'x-large',
                   'figure.figsize': (15, 15),
                   'axes.labelsize': 25,
@@ -115,37 +115,22 @@ class Plots:
                   'ytick.labelsize': 25}
         pylab.rcParams.update(params)
         plt.hist2d(data_x, data_y, bins=amount_bins, normed=True, cmap='binary')
-        # plt.hist2d(data_x, data_y, range=[[np.min(data_x), np.max(data_x)], [30.80, 30.85]], bins=amount_bins, normed=True,
-        #            cmap='binary')
-        # plt.axis('equal')
-        # plt.xlim([-20,40])
-        # plt.ylim([10,70])
-        if name_x == 'Time':
-            or_time=obspy.UTCDateTime(true_time[0], true_time[1], true_time[2], true_time[3], true_time[4], true_time[5])
-            plt.xlabel(or_time.strftime('%Y-%m-%dT%H:%M:%S + sec'))
-            plt.ylabel('%s' % name_y)
-        elif name_y == 'Time':
-
-            or_time=obspy.UTCDateTime(true_time[0], true_time[1], true_time[2], true_time[3], true_time[4], true_time[5])
-            plt.ylabel(or_time.strftime('%Y-%m-%dT%H:%M:%S + sec'))
-            plt.xlabel('%s' % name_x)
-        else:
-            plt.ylabel('%s' % name_y)
-            plt.xlabel('%s' % name_x)
-
-
+        plt.ylabel('%s' % name_y)
+        plt.xlabel('%s' % name_x)
         plt.title('2D posterior marginal', fontsize=25)
         cb = plt.colorbar()
         cb.set_label('Probability')
-        dir_proc = directory + '/2D_margi_Plots/%s' % filename
-        if not os.path.exists(dir_proc):
-            os.makedirs(dir_proc)
-        filepath_proc = dir_proc + '/2D_%s_%s.pdf' % (name_x, name_y)
-        plt.savefig(filepath_proc)
-        # plt.show()
-        plt.close()
+        if show == True:
+            plt.show()
+        else:
+            dir_proc = directory + '/2D_margi_Plots'
+            if not os.path.exists(dir_proc):
+                os.makedirs(dir_proc)
+            filepath_proc = dir_proc + '/2D_%s_%s.pdf' % (name_x, name_y)
+            plt.savefig(filepath_proc)
+            plt.close()
 
-    def marginal_1D(self, data, name, amount_bins, directory, filename, true_time):
+    def marginal_1D(self, data, name, amount_bins, directory, show):
         params = {'legend.fontsize': 'x-large',
                   'figure.figsize': (15, 15),
                   'axes.labelsize': 25,
@@ -155,57 +140,60 @@ class Plots:
         pylab.rcParams.update(params)
         q = np.histogram(data, bins=amount_bins)
         plt.hist(data, bins=amount_bins)
-        if name == 'Time':
-            or_time=obspy.UTCDateTime(true_time[0], true_time[1], true_time[2], true_time[3], true_time[4], true_time[5])
-            plt.xlabel(or_time.strftime('%Y-%m-%dT%H:%M:%S + sec'))
-        else:
-            plt.xlabel('%s' % name)
+        plt.xlabel('%s' % name)
         plt.ylabel('Frequency')
-        if name == 'Time':
-            labels = np.ones_like(data)
-            for i,v in enumerate(data):
-                labels[i] = obspy.UTCDateTime(data[i])
-            plt.xticks(data, labels, rotation='vertical')
-        dir_proc = directory + '/1D_margi_Plots/%s' % filename
-        if not os.path.exists(dir_proc):
-            os.makedirs(dir_proc)
-        filepath_proc = dir_proc + '/1D_%s.pdf' % (name)
-        plt.savefig(filepath_proc)
-        # plt.show()
-        plt.close()
+        if show == True:
+            plt.show()
+        else:
+            dir_proc = directory + '/1D_margi_Plots'
+            if not os.path.exists(dir_proc):
+                os.makedirs(dir_proc)
+            filepath_proc = dir_proc + '/1D_%s.pdf' % (name)
+            plt.savefig(filepath_proc)
+            plt.close()
 
-    def Kernel_density(self, data, data_x, data_y, directory, savename):
-        dir = directory + '/Kernel_density'
-        if not os.path.exists(dir):
-            os.makedirs(dir)
-        # dir_path = dir + '/%s.pdf' %savename
-        dir_path = dir + '/%s_%s_%s.pdf' % (savename, data_x,data_y)
-        h= sns.jointplot(x=data_x, y=data_y, data=data, kind="kde")
+
+    def Kernel_density(self, data, name_x, name_y, directory, savename, show):
+        h= sns.jointplot(x=name_x, y=name_y, data=data, kind="kde")
         plt.tight_layout()
-        plt.savefig(dir_path)
-        plt.close()
+        if show == True:
+            plt.show()
+        else:
+            dir = directory + '/Kernel_density'
+            if not os.path.exists(dir):
+                os.makedirs(dir)
+            # dir_path = dir + '/%s.pdf' %savename
+            dir_path = dir + '/%s_%s_%s.pdf' % (savename, name_x, name_y)
+            plt.savefig(dir_path)
+            plt.close()
 
-    def hist(self, data, data_x, data_y, directory, savename):
-        dir = directory + '/Historgrams'
-        if not os.path.exists(dir):
-            os.makedirs(dir)
-        dir_path = dir + '/%s_%s_%s.pdf' % (savename, data_x,data_y)
-        h= sns.jointplot(x=data_x, y=data_y, data=data, kind="hex")
+    def hist(self, data, name_x, name_y, directory, savename, show):
+        h= sns.jointplot(x=name_x, y=name_y, data=data, kind="hex")
         plt.tight_layout()
-        plt.savefig(dir_path)
-        plt.close()
+        if show == True:
+            plt.show()
+        else:
+            dir = directory + '/Historgrams'
+            if not os.path.exists(dir):
+                os.makedirs(dir)
+            dir_path = dir + '/%s_%s_%s.pdf' % (savename, name_x, name_y)
+            plt.savefig(dir_path)
+            plt.close()
 
-    def Pair_Grid(self, data, directory, savename):
-        dir = directory + '/Pair_grid'
-        if not os.path.exists(dir):
-            os.makedirs(dir)
-        dir_path = dir + '/%s.pdf' % savename
+    def Pair_Grid(self, data, directory, savename,show):
         g = sns.PairGrid(data=data)
         g.map_diag(sns.kdeplot)
         g.map_offdiag(sns.kdeplot, cmap="Blues_d", n_levels=6)
         plt.tight_layout()
-        plt.savefig(dir_path)
-        plt.close()
+        if show == True:
+            plt.show()
+        else:
+            dir = directory + '/Pair_grid'
+            if not os.path.exists(dir):
+                os.makedirs(dir)
+            dir_path = dir + '/%s.pdf' % savename
+            plt.savefig(dir_path)
+            plt.close()
 
     def sampler(self, filepath, directory, savename):
         params = {'legend.fontsize': 'x-large',

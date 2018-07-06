@@ -1,12 +1,11 @@
 import numpy as np
+from obspy.core.stream import Stream
+from obspy.core.trace import Trace
 
 class Forward_problem:
-    def __init__(self, PARAMETERS, G, moment):
-        self.par = PARAMETERS
-        self.moment = moment
-        self.G = G
-
-    def Solve_forward(self):
+    def Solve_forward(self, G, moment):
         # Forward model:
-        data = np.matmul(self.G, self.moment)
+        data = np.matmul(G, moment)
         return data
+
+

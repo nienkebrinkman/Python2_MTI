@@ -10,22 +10,25 @@ class Get_Paramters:
     def specifications(self):
         ## Returns: Dict {}
 
-        # Misfit options:
+        # Misfit options for body waves (SURFACE WAVES ALWAYS L2):
         #   - 'L2' - L2_Norm
         #   - 'CC' - Cross_correlation
         misfit = 'CC'
 
         # MCMC algorithm options:
-        #   - 'MH' - Metropolis Hasting
-        #   - 'M'  - Metropolis
+        #   - MCMC = 'MH' - Metropolis Hasting
+        #   - MCMC = 'M'  - Metropolis
         MCMC = 'M'
+        #   - rnd_one_par = True - Updates only one random parameter each time instead of all at the same time
+        #   - rnd_one_par = False- Updates all parameters at the same time
+        rnd_par = True
 
         # Construct the observed data:
         sdr = True # If True: invert Strike/Dip/Rake, If False: invert m_tt,m_pp,m_rr,m_tp,m_rt,m_rp
-        noise = False
+        noise = True
         plot_modus = False # If True: you make seismogram plots during your MCMC algorithm
         temperature = 1
-        directory = '/home/nienke/Documents/Applied_geophysics/Thesis/anaconda/Results/Tuning'
+        directory = '/home/nienke/Documents/Applied_geophysics/Thesis/anaconda/Final'
         npts = 2000 # The amount of samples of your seismogram
 
 
@@ -37,7 +40,8 @@ class Get_Paramters:
             'MCMC':MCMC,
             'temperature':temperature,
             'directory':directory,
-            'npts': npts}
+            'npts': npts,
+            'rnd_par':rnd_par}
         return SPEC
 
 
@@ -69,8 +73,8 @@ class Get_Paramters:
             'VELOC_taup': 'VELOC_taup',
             'VELOC': 'VELOC',
             'noise_model': 'noise_model',
-            'strike': {'range_min': 'min', 'range_max': 'max', 'spread': 'spread'},
-            'dip': {'range_min': 'min', 'range_max': 'max', 'spread': 'spread'},
+            'strike': {'range_min': 'min', 'range_max': 'max'},
+            'dip': {'range_min': 'min', 'range_max': 'max'},
             'rake': {'range_min': 'min', 'range_max': 'max', 'spread': 'spread'},
             'depth': {'range_min': 'min', 'range_max': 'max', 'step': 'spread'},
             'epi': {'range_min': 'min', 'range_max': 'max', 'spread': 'spread'},
@@ -88,7 +92,7 @@ class Get_Paramters:
         PRIOR['station'] = "SYNT1"  # Station
 
         # -Source
-        PRIOR['M0'] = 1E17
+        PRIOR['M0'] = 1E16
         PRIOR['components'] = ["Z", "R", "T"]
 
         # -filter
@@ -107,23 +111,22 @@ class Get_Paramters:
         # Parameters for velocity model
         # PRIOR['VELOC'] = 'syngine://iasp91_2s'
         # PRIOR['VELOC'] = 'http://instaseis.ethz.ch/marssynthetics/C30VH-BFT13-1s'
-        PRIOR['VELOC'] = 'http://instaseis.ethz.ch/blindtest_1s/EH45TcoldCrust1b_Q100_1s'
+        PRIOR['VELOC'] = 'http://instaseis.ethz.ch/blindtest_1s/EH45TcoldCrust1b_1s'
         # PRIOR['VELOC'] = "/home/nienke/Documents/Applied_geophysics/Thesis/anaconda/Database/10s_PREM"
         PRIOR['VELOC_taup'] = 'EH45TcoldCrust1b.npz'#'iasp91'
 
         # Model used to add noise in seismogram:
-        PRIOR['noise_model'] ='STS2' # 'Tcompact' #
+        PRIOR['noise_model'] = 'Tcompact' #'STS2' #
 
         # Sample / spread ranges for the different parameters
         PRIOR['strike']['range_min'] = 0
-        PRIOR['strike']['range_max'] = 360
-        PRIOR['strike']['spread'] = 1
+        PRIOR['strike']['range_max'] = 359.9
         PRIOR['dip']['range_min'] = 0
-        PRIOR['dip']['range_max'] = 90
-        PRIOR['dip']['spread'] = 1
-        PRIOR['rake']['range_min'] = 0
-        PRIOR['rake']['range_max'] = 180
-        PRIOR['rake']['spread'] = 2
+        PRIOR['dip']['range_max'] = 89.9
+        PRIOR['angle_spread'] = 1
+        PRIOR['rake']['range_min'] = -180
+        PRIOR['rake']['range_max'] = 179
+        PRIOR['rake']['spread'] = 1
 
         PRIOR['depth']['range_min'] = 0
         PRIOR['depth']['range_max'] = 50000
@@ -132,9 +135,8 @@ class Get_Paramters:
         PRIOR['epi']['range_max'] = estimated_epi + 5
         PRIOR['epi']['spread'] = 1
 
-        PRIOR['sample_number'] = 30000
-        PRIOR['var_est'] = 0.05 # Variance estimate 5% off the observed data
-
+        PRIOR['sample_number'] = 10000
+        PRIOR['var_est'] = 0.5
         return PRIOR
 
     def get_unkown(self):
