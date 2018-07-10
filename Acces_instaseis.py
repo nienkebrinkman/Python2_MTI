@@ -42,7 +42,7 @@ time_at_receiver = create.get_receiver_time(PARAMETERS['epi'], PARAMETERS['depth
 
 sw = Surface_waves(PRIOR)
 R_env_obs = sw.rayleigh_pick(tr_obs.traces[0], PARAMETERS['la_s'], PARAMETERS['lo_s'], PARAMETERS['depth_s'],
-                             VALUES['directory'], PARAMETERS['origin_time'], VALUES['npts'],plot_modus=True)
+                             VALUES['directory'], PARAMETERS['origin_time'], VALUES['npts'],plot_modus=False)
 L_env_obs = sw.love_pick(tr_obs.traces[2], PARAMETERS['la_s'], PARAMETERS['lo_s'], PARAMETERS['depth_s'],
                          VALUES['directory'], PARAMETERS['origin_time'], VALUES['npts'])
 
@@ -53,11 +53,11 @@ seis = Seismogram(PRIOR,db)
 window_code = Source_code(PRIOR['VELOC_taup'])
 misfit = Misfit(VALUES['directory'])
 
-start_sample_path = '/home/nienke/Documents/Applied_geophysics/Thesis/anaconda/Final/var_50_resume.txt'
+start_sample_path = '/home/nienke/Documents/Applied_geophysics/Thesis/anaconda/Final/close_sample.txt'
 # start_sample_path = None
 
 m = MCMC_stream(R_env_obs,L_env_obs,traces_obs,p_obs,s_obs,PRIOR,db,VALUES,time_at_receiver,start_sample_path)
-m.start_MCMC(VALUES['directory'] + '/var_50_resumed.txt')
+m.start_MCMC(VALUES['directory'] + '/check_seismograms.txt')
 
 # file_path = VALUES['directory'] + '/MCMC.txt'
 # with open(file_path, 'w') as save_file:

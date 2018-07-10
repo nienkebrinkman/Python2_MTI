@@ -76,8 +76,8 @@ class MCMC_stream:
                 epi_sample = epi_old
                 depth_sample = np.around(np.random.normal(depth_old, self.prior['depth']['spread']), decimals=1)
             else:
-                epi_sample = np.random.normal(epi_old, self.prior['epi']['spread'])
-                depth_sample = np.around(np.random.normal(depth_old, self.prior['depth']['spread']), decimals=1)
+                epi_sample= epi_old
+                depth_sample = depth_old
         return epi_sample, depth_sample
 
     def model_samples_sdr(self, strike_old=None, dip_old=None, rake_old=None):
@@ -160,7 +160,7 @@ class MCMC_stream:
                 strike = strike_old
                 dip = dip_old
                 rake = rake_old
-        return strike, dip, rake
+        return strike, dip,rake
 
     def G_function(self, epi, depth, moment_old=None):
         dict = geo.Geodesic(a=self.prior['radius'], f=0).ArcDirect(lat1=self.prior['la_r'], lon1=self.prior['lo_r'],
@@ -182,7 +182,6 @@ class MCMC_stream:
                                           npts=self.npts, plot_modus=False)
 
             total_syn, p_syn, s_syn = self.window.get_window_obspy(traces_syn, epi, depth, self.time_at_rec, self.npts)
-
             return R_env_syn, L_env_syn, total_syn, p_syn, s_syn, np.array([strike, dip, rake])
 
         else:
@@ -199,155 +198,216 @@ class MCMC_stream:
             return total_syn, p_syn, s_syn, moment
 
     def start_MCMC(self, savepath):
+        savepath_reject = savepath.replace('.txt','_reject.txt')
         with open(savepath, 'w') as save_file:
-            self.write_par(save_file)
-            accepted = 0
-            rejected = 0
-            for i in range(self.prior['sample_number']):
-                if i % 10 == 0:
-                    print("proposal: %i, accepted: %i" % (i, accepted))
-                    print("proposal: %i, rejected: %i" % (i, rejected))
+            with open(savepath_reject,'w') as save_reject_file:
+                self.write_par(save_file)
+                accepted = 0
+                rejected = 0
+                for i in range(self.prior['sample_number']):
+                    if i % 10 == 0:
+                        print("proposal: %i, accepted: %i" % (i, accepted))
+                        print("proposal: %i, rejected: %i" % (i, rejected))
 
-                if i == 0 or self.MCMC == 'MH':
-                    if self.start_sample == None:
-                        epi, depth = self.model_samples()
-                        R_env_syn, L_env_syn, total_syn, p_syn, s_syn, moment = self.G_function(epi, depth)
+                    if i == 0 or self.MCMC == 'MH':
+                        if self.start_sample == None:
+                            epi, depth = self.model_samples()
+                            R_env_syn, L_env_syn, total_syn, p_syn, s_syn, moment = self.G_function(epi, depth)
+                        else:
+                            if self.rnd_par == True:
+                                self.update = np.random.choice(['epi', 'depth', 'moment'], 1)[0]
+                            else:
+                                self.update = None
+                            data = np.loadtxt(self.start_sample, delimiter=',')
+                            epi = data[0]
+                            depth = data[1]
+                            moment_old = np.array([data[2], data[3], data[4]])
+                            R_env_syn, L_env_syn, total_syn, p_syn, s_syn, moment = self.G_function(epi, depth, moment_old)
+
                     else:
                         if self.rnd_par == True:
-                            self.update = np.random.choice(['epi', 'depth', 'moment'], 1)[0]
+                            self.update = np.random.choice(['epi','depth','moment'],1)[0]
                         else:
                             self.update = None
-                        data = np.loadtxt(self.start_sample, delimiter=',')
-                        epi = data[0]
-                        depth = data[1]
-                        moment_old = np.array([data[2], data[3], data[4]])
+                        epi, depth = self.model_samples(epi_old, depth_old)
+                        if epi < self.prior['epi']['range_min'] or epi > self.prior['epi']['range_max'] or depth < \
+                                self.prior['depth']['range_min'] or depth > self.prior['depth']['range_max']:
+                            continue
                         R_env_syn, L_env_syn, total_syn, p_syn, s_syn, moment = self.G_function(epi, depth, moment_old)
 
-                else:
-                    if self.rnd_par == True:
-                        self.update = np.random.choice(['epi','depth','moment'],1)[0]
+
+                    if self.xi == 'L2':
+                        Xi_bw, time_shift_new = self.misfit.L2_stream(self.p_tr_obs, p_syn, self.s_tr_obs, s_syn,
+                                                                      self.time_at_rec, self.prior['var_est'])
+                        Xi_R = self.misfit.SW_L2(self.R_env_obs, R_env_syn, self.prior['var_est'])
+                        Xi_L = self.misfit.SW_L2(self.L_env_obs, L_env_syn, self.prior['var_est'])
+                        Xi_new = Xi_bw + Xi_R + Xi_L
+                    elif self.xi == 'CC':
+                        Xi_bw_new, time_shift_new = self.misfit.CC_stream(self.p_tr_obs, p_syn, self.s_tr_obs, s_syn,
+                                                                      self.time_at_rec)
+                        s_z_new = 0.1*Xi_bw_new[0]
+                        s_r_new = 0.1*Xi_bw_new[1]
+                        s_t_new = 5*Xi_bw_new[2]
+                        p_z_new = 5*Xi_bw_new[3]
+                        p_r_new = 5*Xi_bw_new[4]
+                        bw_new = s_z_new+s_r_new+s_t_new+p_z_new+p_r_new
+                        Xi_R_new = self.misfit.SW_L2(self.R_env_obs, R_env_syn, self.prior['var_est'])
+                        R_1_new = Xi_R_new[0]
+                        R_2_new = Xi_R_new[1]
+                        R_3_new = Xi_R_new[2]
+                        R_4_new = Xi_R_new[3]
+                        rw_new= R_1_new+R_2_new+R_3_new+R_4_new
+                        Xi_L_new = self.misfit.SW_L2(self.L_env_obs, L_env_syn, self.prior['var_est'])
+                        L_1_new = Xi_L_new[0]
+                        L_2_new = Xi_L_new[1]
+                        L_3_new = Xi_L_new[2]
+                        L_4_new = Xi_L_new[3]
+                        lw_new = L_1_new+L_2_new+L_3_new+L_4_new
+
+                        Xi_new = bw_new + rw_new + lw_new
                     else:
-                        self.update = None
-                    epi, depth = self.model_samples(epi_old, depth_old)
-                    if epi < self.prior['epi']['range_min'] or epi > self.prior['epi']['range_max'] or depth < \
-                            self.prior['depth']['range_min'] or depth > self.prior['depth']['range_max']:
+                        raise ValueError('misfit is not specified correctly, choose either: L2 or CC in string format')
+
+                    if i == 0:
+                        s_z_old = s_z_new
+                        s_r_old = s_r_new
+                        s_t_old = s_t_new
+                        p_z_old = p_z_new
+                        p_r_old = p_r_new
+                        bw_old = bw_new
+                        R_1_old =R_1_new
+                        R_2_old =R_2_new
+                        R_3_old =R_3_new
+                        R_4_old =R_4_new
+                        rw_old=rw_new
+                        L_1_old = L_1_new
+                        L_2_old = L_2_new
+                        L_3_old = L_3_new
+                        L_4_old = L_4_new
+                        lw_old = lw_new
+                        Xi_old =Xi_new
+
+
+                        epi_old = epi
+                        depth_old = depth
+                        moment_old = moment
+                        self.write_sample(save_file, epi_old, depth_old,moment_old, Xi_old, s_z_old,s_r_old,s_t_old,p_z_old,p_r_old,bw_old,R_1_old,R_2_old,R_3_old,R_4_old,rw_old,L_1_old,L_2_old,L_3_old,L_4_old,lw_old, accept=1)
+
+                        if self.plot_modus == True:
+                            plot_traces = p_syn.__add__(s_syn)
+                            self.plot(1,plot_traces,label="bw",iter="zero",accepted=True)
+                            self.plot(2,R_env_syn,label="R",iter="zero",accepted=True)
+                            self.plot(3,L_env_syn,label="L",iter="zero",accepted=True)
+
+                            self.plot(4,plot_traces,label="bw",iter="zero",accepted=False)
+                            self.plot(5,R_env_syn,label="R",iter="zero",accepted=False)
+                            self.plot(6,L_env_syn,label="L",iter="zero",accepted=False)
+
+
                         continue
-                    R_env_syn, L_env_syn, total_syn, p_syn, s_syn, moment = self.G_function(epi, depth, moment_old)
+
+                    random = np.random.random_sample((1,))
+                    if (Xi_new < Xi_old) or (np.exp((Xi_old - Xi_new) / self.temperature) > random):
+                        s_z_old = s_z_new
+                        s_r_old = s_r_new
+                        s_t_old = s_t_new
+                        p_z_old = p_z_new
+                        p_r_old = p_r_new
+                        bw_old = bw_new
+                        R_1_old =R_1_new
+                        R_2_old =R_2_new
+                        R_3_old =R_3_new
+                        R_4_old =R_4_new
+                        rw_old=rw_new
+                        L_1_old = L_1_new
+                        L_2_old = L_2_new
+                        L_3_old = L_3_new
+                        L_4_old = L_4_new
+                        lw_old = lw_new
+                        Xi_old =Xi_new
+
+                        epi_old = epi
+                        depth_old = depth
+                        moment_old = moment
+                        accepted = accepted + 1
+                        self.write_sample(save_file, epi_old, depth_old, moment_old, Xi_old, s_z_old,s_r_old,s_t_old,p_z_old,p_r_old,bw_old,R_1_old,R_2_old,R_3_old,R_4_old,rw_old,L_1_old,L_2_old,L_3_old,L_4_old,lw_old, accept=1)
+                        if i % 10 == 0:
+
+                            if self.plot_modus == True:
+                                plot_traces = plot_traces.copy()
+                                plot_traces = p_syn.__add__(s_syn)
+                                self.plot(1, plot_traces, label=None, iter=None, accepted=True)
+                                self.plot(2, R_env_syn, label=None, iter=None, accepted=True)
 
 
-                if self.xi == 'L2':
-                    Xi_bw, time_shift_new = self.misfit.L2_stream(self.p_tr_obs, p_syn, self.s_tr_obs, s_syn,
-                                                                  self.time_at_rec, self.prior['var_est'])
-                    Xi_R = self.misfit.SW_L2(self.R_env_obs, R_env_syn, self.prior['var_est'])
-                    Xi_L = self.misfit.SW_L2(self.L_env_obs, L_env_syn, self.prior['var_est'])
-                    Xi_new = Xi_bw + Xi_R + Xi_L
-                elif self.xi == 'CC':
-                    Xi_bw, time_shift_new = self.misfit.CC_stream(self.p_tr_obs, p_syn, self.s_tr_obs, s_syn,
-                                                                  self.time_at_rec)
-                    Xi_R = self.misfit.SW_L2(self.R_env_obs, R_env_syn, self.prior['var_est'])
-                    Xi_L = self.misfit.SW_L2(self.L_env_obs, L_env_syn, self.prior['var_est'])
-                    Xi_new = Xi_bw + Xi_R + Xi_L
-                else:
-                    raise ValueError('misfit is not specified correctly, choose either: L2 or CC in string format')
+                    else:
+                        rejected += 1
+                        self.write_sample(save_file, epi, depth,moment, Xi_old, s_z_old,s_r_old,s_t_old,p_z_old,p_r_old,bw_old,R_1_old,R_2_old,R_3_old,R_4_old,rw_old,L_1_old,L_2_old,L_3_old,L_4_old,lw_old, accept=0)
+                        self.write_sample(save_reject_file, epi, depth,moment, Xi_new, s_z_new,s_r_new,s_t_new,p_z_new,p_r_new,bw_new,R_1_new,R_2_new,R_3_new,R_4_new,rw_new,L_1_new,L_2_new,L_3_new,L_4_new,lw_new, accept=0)
+                        if i % 10 == 0:
+                            if self.plot_modus == True:
+                                plot_traces = plot_traces.copy()
+                                plot_traces = p_syn.__add__(s_syn)
+                                self.plot(4, plot_traces, label=None, iter=None, accepted=False)
+                                self.plot(5, R_env_syn, label=None, iter=None, accepted=False)
+                                self.plot(6, L_env_syn, label=None, iter=None, accepted=False)
 
-                if i == 0:
-                    Xi_old = Xi_new
-                    epi_old = epi
-                    depth_old = depth
-                    moment_old = moment
-                    self.write_sample(save_file, epi, depth, Xi_new, Xi_new, moment, epi,depth,moment, accept=1)
-                    if self.plot_modus == True:
-                        sns.set()
-                        plt.figure(9)
-                        plt.subplot(311)
-                        plt.plot(total_syn[0], label="old_Z_syn")
-                        plt.subplot(312)
-                        plt.plot(total_syn[1], label="old_R_syn")
-                        plt.subplot(313)
-                        plt.plot(total_syn[2], label="old_T_syn")
-                        # f, (ax1, ax2, ax3) = plt.subplots(3, sharex=True, sharey=True)
-                        # ax1.plot(total_syn[0], label="old_Z_syn")
-                        # ax2.plot(total_syn[1], label="old_R_syn")
-                        # ax3.plot(total_syn[2], label="old_T_syn")
-                    continue
 
-                random = np.random.random_sample((1,))
-                if Xi_new < Xi_old or np.exp((Xi_old - Xi_new) / self.temperature) > random:
+                if self.plot_modus == True:
+                    plot_obs = self.p_tr_obs.__add__(self.s_tr_obs)
+                    self.plot(1, plot_obs, label="bw", iter="final", accepted=True)
+                    self.plot(2, self.R_env_obs, label="R", iter="final", accepted=True)
+                    self.plot(3, self.L_env_obs, label="L", iter="final", accepted=True)
 
-                    if self.plot_modus == True:
-                        plt.figure(9)
-                        plt.subplot(311)
-                        plt.plot(total_syn[0])
-                        plt.subplot(312)
-                        plt.plot(total_syn[1])
-                        plt.subplot(313)
-                        plt.plot(total_syn[2])
-                        # ax1.plot(total_syn[0])
-                        # ax2.plot(total_syn[1])
-                        # ax3.plot(total_syn[2])
-                    self.write_sample(save_file, epi, depth, Xi_new, Xi_new, moment, epi, depth,moment ,accept=1)
-                    epi_old = epi
-                    depth_old = depth
-                    Xi_old = Xi_new
-                    moment_old = moment
-                    accepted = accepted + 1
-                else:
-                    rejected += 1
-                    self.write_sample(save_file, epi_old, depth_old, Xi_old, Xi_new, moment_old, epi,depth,moment,accept=0)
-                    if self.plot_modus == True:
-                        plt.figure(10)
-                        plt.subplot(311)
-                        plt.plot(total_syn[0])
-                        plt.subplot(312)
-                        plt.plot(total_syn[1])
-                        plt.subplot(313)
-                        plt.plot(total_syn[2])
+                    self.plot(4, plot_obs, label="bw", iter="final", accepted=False)
+                    self.plot(5, self.R_env_obs, label="R", iter="final", accepted=False)
+                    self.plot(6, self.L_env_obs, label="L", iter="final", accepted=False)
 
-            if self.plot_modus == True:
-                plt.figure(9)
-                plt.subplot(311)
-                plt.plot(self.total_tr_obs[0], linestyle=':', label="Observed data")
-                plt.legend(loc='upper right')
-                plt.tight_layout()
-                plt.subplot(312)
-                plt.plot(self.total_tr_obs[1], linestyle=':', label="Observed data")
-                plt.legend(loc='upper right')
-                plt.tight_layout()
-                plt.subplot(313)
-                plt.plot(self.total_tr_obs[2], linestyle=':', label="Observed data")
-                plt.legend(loc='upper right')
-                # ax1.plot(self.total_tr_obs[0].data[:2000], linestyle=':', label="Observed data")
-                # ax2.plot(self.total_tr_obs[1].data[:2000], linestyle=':', label="Observed data")
-                # ax3.plot(self.total_tr_obs[2].data[:2000], linestyle=':', label="Observed data")
-                # ax1.legend()
-                # ax2.legend()
-                # ax3.legend()
-                plt.tight_layout()
-                plt.savefig(self.directory + '/accepted.pdf')
-                plt.close()
+            save_file.close()
+    def plot(self,figure_number, stream_to_plot,label,iter,accepted=True):
+        # -- Label -- [String]
+        # bw - P_z,P_r,S_z,S_r,S_t
+        # R  - 10_20,08-16,16-32,24-48
+        # L  - 24_48,16_32,12_24,08_16
+        #None- No label
 
-                plt.figure(10)
-                plt.subplot(311)
-                plt.plot(self.total_tr_obs[0], linestyle=':', label="Observed data")
-                plt.legend(loc='upper right')
-                plt.tight_layout()
-                plt.subplot(312)
-                plt.plot(self.total_tr_obs[1], linestyle=':', label="Observed data")
-                plt.legend(loc='upper right')
-                plt.tight_layout()
-                plt.subplot(313)
-                plt.plot(self.total_tr_obs[2], linestyle=':', label="Observed data")
-                plt.legend(loc='upper right')
-                # ax1.plot(self.total_tr_obs[0].data[:2000], linestyle=':', label="Observed data")
-                # ax2.plot(self.total_tr_obs[1].data[:2000], linestyle=':', label="Observed data")
-                # ax3.plot(self.total_tr_obs[2].data[:2000], linestyle=':', label="Observed data")
-                # ax1.legend()
-                # ax2.legend()
-                # ax3.legend()
-                plt.tight_layout()
-                plt.savefig(self.directory + '/rejected.pdf')
-                plt.close()
-        save_file.close()
+        # -- Iter -- [String]
+        # zero - First iteration --> staring sample in label
+        # final- Last iteration --> observed sample in label and saves/closes the figure
+        # None - Nothing happens
+        if label == "bw":
+            lab = np.array(["P_z","P_r","S_z","S_r","S_t"])
+        elif label == "R":
+            lab = np.array(["10_20","08-16","16-32","24-48"])
+        elif label == "L":
+            lab = np.array(["24_48","16_32","12_24","08_16"])
+        else:
+            lab = None
+
+
+        plt.figure(figure_number)
+        for i in range(len(stream_to_plot)):
+            subplot_no=len(stream_to_plot)*100+10+i+1
+            plt.subplot(subplot_no)
+            if lab is None:
+                plt.plot(self.zero_to_nan(stream_to_plot.traces[i].data),alpha=0.5,linewidth=0.3)
+            else:
+                if iter == "zero":
+                    plt.plot(self.zero_to_nan(stream_to_plot.traces[i].data), alpha=0.5, linewidth=0.3,label="start_sample:%s" %lab[i],linestyle=":")
+                elif iter == "final":
+                    plt.plot(self.zero_to_nan(stream_to_plot.traces[i].data), alpha=0.5, linewidth=0.3, label="obs_sample:%s" % lab[i],c='k')
+                    plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=3,ncol=2, mode="expand", borderaxespad=0.)
+                    plt.tight_layout()
+        if iter == "final":
+            if accepted == True:
+                plt.savefig(self.directory + '/Accepted_%s.pdf'%label)
+            else:
+                plt.savefig(self.directory + '/Rejected_%s.pdf'%label)
+
+
+    def zero_to_nan(self,values):
+        """Replace every 0 with 'nan' and return a copy."""
+        return [float('nan') if x == 0 else x for x in values]
 
     def write_par(self, txt_file):
         txt_file.write("Velocity model:%s\n\r" % self.prior['VELOC'])  # Velocity model used
@@ -389,16 +449,10 @@ class MCMC_stream:
             self.time_at_rec.year, self.time_at_rec.month, self.time_at_rec.day,
             self.time_at_rec.hour, self.time_at_rec.minute, self.time_at_rec.second))  #
 
-    def write_sample(self, file_name, epi, depth, Xi_new, Xi_old, moment, epi_old, depth_old, moment_old, accept=0):
+    def write_sample(self, file_name, epi, depth,moment, Xi_old, s_z_old,s_r_old,s_t_old,p_z_old,p_r_old,bw_old,R_1_old,R_2_old,R_3_old,R_4_old,rw_old,L_1_old,L_2_old,L_3_old,L_4_old,lw_old, accept=0):
         if self.sdr == True:
-            file_name.write("%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%i,%.4f,%.4f,%.4f,%.4f,%.4f\n\r" % (
-                epi, depth, moment[0], moment[1],
-                moment[2], Xi_new, Xi_old, accept, epi_old, depth_old, moment_old[0], moment_old[1],
-                moment_old[2]))
-        else:
-            file_name.write("%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f%.4f,%.4f,%i,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f\n\r" % (
-                epi, depth, moment[0], moment[1], moment[2], moment[3], moment[4], Xi_new, Xi_old, accept, epi_old,
-                depth_old, moment_old[0], moment_old[1], moment_old[2], moment_old[3], moment_old[4]))
+            file_name.write("%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%i\n\r" % (
+                epi, depth, moment[0], moment[1],moment[2], Xi_old,s_z_old,s_r_old,s_t_old,p_z_old,p_r_old,bw_old,R_1_old,R_2_old,R_3_old,R_4_old,rw_old,L_1_old,L_2_old,L_3_old,L_4_old,lw_old, accept))
 
     def run_parallel(self):
         if not self.MCMC == 'M' or self.MCMC == 'MH':

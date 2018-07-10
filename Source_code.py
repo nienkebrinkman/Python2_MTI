@@ -31,10 +31,10 @@ class Source_code:
         p_stream=Stream()
         p_time = time.timestamp + tt_P
         s_time = time.timestamp + tt_S
-        start_time_p = obspy.UTCDateTime(p_time - 10)
-        start_time_s = obspy.UTCDateTime(s_time - 10)
-        end_time_p = obspy.UTCDateTime(p_time + 44.2)
-        end_time_s = obspy.UTCDateTime(s_time + 44.2)
+        start_time_p = obspy.UTCDateTime(p_time - 5)
+        start_time_s = obspy.UTCDateTime(s_time - 5)
+        end_time_p = obspy.UTCDateTime(p_time + 20)
+        end_time_s = obspy.UTCDateTime(s_time + 20)
 
         for i, trace in enumerate(seis_traces.traces):
             P_trace = Trace.slice(trace, start_time_p, end_time_p)
@@ -106,9 +106,9 @@ class Source_code:
         diff = tt_S - tt_P
 
         P_start = time_at_receiver
-        P_end = obspy.UTCDateTime(P_start+10+44.2)
+        P_end = obspy.UTCDateTime(P_start+5+20)
         S_start = obspy.UTCDateTime(time_at_receiver.timestamp + diff)
-        S_end = obspy.UTCDateTime(S_start+10+44.2)
+        S_end = obspy.UTCDateTime(S_start+5+20)
 
         p_stream = Stream()
         s_stream = Stream()

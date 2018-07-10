@@ -81,13 +81,13 @@ class Misfit:
         # S - correlations:
         for i in range(len(s_obs)):
             cc_obspy = cc.correlate(s_obs[i].data, s_syn[i].data, int(0.25*len(s_obs[i].data)))
-            shift, CC_s = cc.xcorr_max(cc_obspy)
+            shift, CC_s = cc.xcorr_max(cc_obspy, abs_max=False)
 
             s_syn_shift_obspy = self.shift(s_syn[i].data, -shift)
 
             D_s = 1 - CC_s  # Decorrelation
             time_shift = np.append(time_shift, shift)
-            misfit = np.append(misfit, ((CC_s - 0.95) ** 2) / (2 * (0.1) ** 2) + np.abs(shift))
+            misfit = np.append(misfit, ((CC_s - 0.95) ** 2) / (2 * (0.1) ** 2))# + np.abs(shift))
 
             # misfit = np.append(misfit,((CC - 0.95) ** 2) / (2 * (0.1) ** 2))
 
@@ -100,13 +100,13 @@ class Misfit:
         # P- correlation
         for i in range(len(p_obs)):
             cc_obspy = cc.correlate(p_obs[i].data, p_syn[i].data, int( 0.25*len(p_obs[i].data)))
-            shift, CC_p = cc.xcorr_max(cc_obspy)
+            shift, CC_p = cc.xcorr_max(cc_obspy ,abs_max=False)
 
             p_syn_shift_obspy = self.shift(p_syn[i].data, -shift)
 
             D_p = 1 - CC_p  # Decorrelation
             time_shift = np.append(time_shift, shift)
-            misfit = np.append(misfit, ((CC_p - 0.95) ** 2) / (2 * (0.1) ** 2) + np.abs(shift))
+            misfit = np.append(misfit, ((CC_p - 0.95) ** 2) / (2 * (0.1) ** 2)) #+ np.abs(shift))
 
             # misfit = np.append(misfit,((CC - 0.95) ** 2) / (2 * (0.1) ** 2))
 
@@ -117,7 +117,7 @@ class Misfit:
             # plt.show()
             # plt.close()
         sum_misfit = np.sum(misfit)
-        return sum_misfit, time_shift
+        return misfit, time_shift
 
     def shift(self, np_array, time_shift):
         new_array = np.zeros_like(np_array)
@@ -179,4 +179,4 @@ class Misfit:
             # plt.show()
             # plt.close()
         sum_misfit = np.sum(misfit)
-        return sum_misfit
+        return misfit

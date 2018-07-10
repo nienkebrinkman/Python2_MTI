@@ -10,23 +10,33 @@ import pandas as pd
 import matplotlib.pylab as plt
 import mplstereonet
 import yaml
+from obspy.imaging.beachball import aux_plane
+import pylab
+
+from Get_Parameters import Get_Paramters
 
 
 def main():
     ## Post - Processing [processing the results from inversion]
     result = Post_processing_sdr()
 
-    directory = '/home/nienke/Documents/Applied_geophysics/Thesis/anaconda/Additional_scripts/Iteration_runs'
-    path_to_file = '/home/nienke/Documents/Applied_geophysics/Thesis/anaconda/Additional_scripts/Iteration_runs/iter_4_10000.txt'
+    directory = '/home/nienke/Documents/Applied_geophysics/Thesis/anaconda/Final'
+    path_to_file = '/home/nienke/Documents/Applied_geophysics/Thesis/anaconda/Final/small_window_reject.txt'
+    # path= '/home/nienke/Documents/Applied_geophysics/Thesis/anaconda/Additional_scripts/Iteration_runs/Together'
 
-    savename = '10000'
+    savename = 'Trials'
     show = False  # Choose True for direct show, choose False for saving
-
+    skiprows = 70
+    column_names= ["Epi", "Depth", "Strike", "Dip", "Rake", "Total_misfit","S_z","S_r","S_t","P_z","P_r","BW_misfit","R_1","R_2","R_3","R_4","R_tot","L_1","L_2","L_3","L_4","L_tot","Acceptance"]
+    # path_to_file, save = result.convert_txt_folder_to_yaml(path, savename)
     # result.get_stereonets(filepath=path_to_file, savename=savename, directory=directory, show=show)
-    result.get_accepted_samples(filepath=path_to_file,savename=savename,directory=directory)
-    result.get_convergence(filepath=path_to_file, savename=savename, directory=directory, show=show)
-    result.Seaborn_plots(filepath=path_to_file, savename=savename, directory=directory, show=show)
-    result.get_pdf(filepath=path_to_file, savename=savename, directory=directory, show=show)
+
+    result.trace_density(filepath=path_to_file, savename=savename, directory=directory, skiprows=skiprows, column_names=column_names,show=show)
+    # result.get_accepted_samples(filepath=path_to_file,savename=savename,directory=directory, column_names,skiprows=skiprows)
+    result.get_convergence(filepath=path_to_file, savename=savename, directory=directory, skiprows=skiprows, column_names=column_names,show=show)
+    # result.Seaborn_plots(filepath=path_to_file, savename=savename, directory=directory, skiprows=skiprows, column_names,show=show)
+    result.combine_all(filepath=path_to_file, savename=savename, directory=directory,skiprows=skiprows, column_names=column_names, show=show)
+    result.get_pdf(filepath=path_to_file, savename=savename, directory=directory, skiprows=skiprows, column_names=column_names,show=show)
 
 
 class Post_processing_sdr:
@@ -71,7 +81,7 @@ class Post_processing_sdr:
             yaml_file.close()
             return save_path, savename
 
-    def get_accepted_samples(self,filepath,savename,directory):
+    def get_accepted_samples(self,filepath,savename,directory,skiprows,column_names):
         dir = directory + '/%s' % (savename)
         if not os.path.exists(dir):
             os.makedirs(dir)
@@ -84,12 +94,10 @@ class Post_processing_sdr:
                 # parameters = data_file['parameters']
         else:
             # parameters = open(filepath, "r").readlines()[:33]
-            data = np.loadtxt(filepath, delimiter=',', skiprows=70)
+            data = np.loadtxt(filepath, delimiter=',', skiprows=skiprows)
 
         df = pd.DataFrame(data,
-                          columns=["Epicentral_distance", "Depth", "Strike", "Dip", "Rake", "Misfit_accepted",
-                                   "Misfit_rejected", "Acceptance", "Epi_reject", "depth_reject", "Strike_reject",
-                                   "Dip_reject", "Rake_reject"])
+                          columns=column_names)
         total = len(df["Acceptance"])
         accepted = np.sum(df["Acceptance"]==1)
         savepath = dir + '/Accept_%i_outof_%i.txt' % (accepted,total)
@@ -97,9 +105,9 @@ class Post_processing_sdr:
             save_file.write("%i,%i\n\r" % (total,accepted))
         save_file.close()
         print("Total amount of samples = %i" % len(df["Acceptance"]))
-        print("Total amount of samples = %i" % np.sum(df["Acceptance"]==1))
+        print("Total amount of accepted samples = %i" % np.sum(df["Acceptance"]==1))
 
-    def get_convergence(self, filepath, savename, directory, show=True):
+    def get_convergence(self, filepath, savename, directory,skiprows, column_names,show=True):
         dir = directory + '/%s' % (savename)
         if not os.path.exists(dir):
             os.makedirs(dir)
@@ -112,16 +120,15 @@ class Post_processing_sdr:
                 # parameters = data_file['parameters']
         else:
             # parameters = open(filepath, "r").readlines()[:33]
-            data = np.loadtxt(filepath, delimiter=',', skiprows=70)
-
+            data = np.loadtxt(filepath, delimiter=',', skiprows=skiprows)
+        #
         df = pd.DataFrame(data,
-                          columns=["Epicentral_distance", "Depth", "Strike", "Dip", "Rake", "Misfit_accepted",
-                                   "Misfit_rejected", "Acceptance", "Epi_reject", "depth_reject", "Strike_reject",
-                                   "Dip_reject", "Rake_reject"])
-
+                          columns=column_names)
+        # df = pd.DataFrame(data,
+        #                   columns=["Epicentral_distance", "Depth", "Strike", "Dip", "Rake", "Total_misfit","BW_misfit","R_misfit","L_misfit"])
         plt.figure(1)
         ax = plt.subplot(111)
-        ax.plot(np.arange(0, len(df['Misfit_accepted'])), df['Misfit_accepted'])
+        ax.plot(np.arange(0, len(df['Total_misfit'])), df['Total_misfit'])
         plt.xlabel('Iteration')
         plt.ylabel('-Log(likelihood)')
         ax.invert_yaxis()
@@ -134,7 +141,127 @@ class Post_processing_sdr:
             plt.savefig(dir + '/Convergence.pdf')
             plt.close()
 
-    def get_pdf(self, filepath, savename, directory, show=True):
+    def combine_all(self, filepath, savename, directory, skiprows, column_names,show=True):
+        dir = directory + '/%s' % (savename.strip('.yaml'))
+        if not os.path.exists(dir):
+            os.makedirs(dir)
+
+        if filepath.endswith('.yaml') == True:
+            with open(filepath, 'r') as stream:
+                data_file = yaml.load(stream)
+                stream.close()
+                data = data_file['data']
+                # parameters = data_file['parameters']
+        else:
+            # parameters = open(filepath, "r").readlines()[:33]
+            data = np.loadtxt(filepath, delimiter=',', skiprows=skiprows)
+
+        df = pd.DataFrame(data,
+                          columns=column_names)
+        df_select = df[["Epi", "Depth", "Strike", "Dip", "Rake"]]
+        fig = plt.figure(figsize=(20,20))
+        ax1 = plt.subplot2grid((5,2),(0,0))
+        ax1.plot(df_select['Epi'],label="Epi")
+        plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=3,
+           ncol=2, mode="expand", borderaxespad=0.)
+        plt.tight_layout()
+        ax2 = plt.subplot2grid((5,2), (0, 1))
+        ax2.plot(df_select['Depth'],label="Depth")
+        plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=3,
+           ncol=2, mode="expand", borderaxespad=0.)
+        plt.tight_layout()
+        ax3 = plt.subplot2grid((5,2), (1,0),colspan=2)
+        ax3.plot(df_select['Strike'], label = "Strike")
+        ax3.plot(df_select['Dip'], label = "Dip")
+        ax3.plot(df_select['Rake'], label = "Rake")
+        plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        plt.tight_layout()
+        df_select_xi = df[["Total_misfit","S_z","S_r","S_t","P_z","P_r","BW_misfit","R_1","R_2","R_3","R_4","R_tot","L_1","L_2","L_3","L_4","L_tot"]]
+        ax4 = plt.subplot2grid((5, 2), (2, 0), colspan=2)
+        ax4.plot(df_select_xi['Total_misfit'], label = "Total_misfit")
+        ax4.plot(df_select_xi['S_z'], label = "S_z")
+        ax4.plot(df_select_xi['S_r'], label = "S_r")
+        ax4.plot(df_select_xi['S_t'], label = "S_t")
+        ax4.plot(df_select_xi['P_z'], label = "P_z")
+        ax4.plot(df_select_xi['P_r'], label = "P_r")
+        ax4.plot(df_select_xi['BW_misfit'], label = "BW_tot")
+        plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        plt.tight_layout()
+        ax5=plt.subplot2grid((5,2),(3,0),colspan=2)
+        ax5.plot(df_select_xi['R_1'], label = "R_1")
+        ax5.plot(df_select_xi['R_2'], label = "R_2")
+        ax5.plot(df_select_xi['R_3'], label = "R_3")
+        ax5.plot(df_select_xi['R_4'], label = "R_4")
+        ax5.plot(df_select_xi['R_tot'], label = "R_tot")
+        plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        plt.tight_layout()
+        ax6 = plt.subplot2grid((5,2),(4,0),colspan=2)
+        ax6.plot(df_select_xi['L_1'], label = "L_1")
+        ax6.plot(df_select_xi['L_2'], label = "L_2")
+        ax6.plot(df_select_xi['L_3'], label = "L_3")
+        ax6.plot(df_select_xi['L_4'], label = "L_4")
+        ax6.plot(df_select_xi['L_tot'], label = "L_tot")
+        plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        plt.tight_layout()
+        plt.savefig(dir+'/combined_all_par.pdf')
+        plt.close()
+
+    def trace_density(self, filepath, savename, directory,skiprows, column_names, show=True):
+        dir = directory + '/%s' % (savename.strip('.yaml'))
+        if not os.path.exists(dir):
+            os.makedirs(dir)
+
+        if filepath.endswith('.yaml') == True:
+            with open(filepath, 'r') as stream:
+                data_file = yaml.load(stream)
+                stream.close()
+                data = data_file['data']
+                # parameters = data_file['parameters']
+        else:
+            # parameters = open(filepath, "r").readlines()[:33]
+            data = np.loadtxt(filepath, delimiter=',', skiprows=skiprows)
+        #
+        df = pd.DataFrame(data,
+                          columns=column_names)
+        df_select = df[["Epi", "Depth", "Strike", "Dip", "Rake"]]
+        par=Get_Paramters()
+        REAL = par.get_unkown()
+        real_v=np.array([REAL['epi'],REAL['depth_s'],REAL['strike'], REAL['dip'],REAL['rake']])
+        strike,dip,rake = aux_plane(REAL['strike'],REAL['dip'],REAL['rake'])
+
+
+        fig = plt.figure(figsize=(20,10))
+        row = 0
+
+        for i in df_select:
+            ax1 = plt.subplot2grid((5,2),(row,0))
+            ax1.plot(df_select[i],label=i)
+            ax1.set_title("Trace %s" %i ,color= 'b')
+            ax1.set_xlabel("Iteration")
+            # ax1.set_ylabel("Epicentral ")
+            plt.tight_layout()
+            ax2 = plt.subplot2grid((5,2), (row, 1))
+            plt.hist(df_select[i],bins=100)
+            ymin, ymax = ax2.get_ylim()
+            plt.vlines(df_select[i][1],ymin=ymin,ymax=ymax,colors='r')
+            plt.vlines(real_v[row],ymin=ymin,ymax=ymax,colors='k')
+            if i == 'Strike':
+                plt.vlines(strike,ymin=ymin,ymax=ymax,colors='g')
+            if i == 'Dip':
+                plt.vlines(dip,ymin=ymin,ymax=ymax,colors='g')
+            if i == 'Rake':
+                plt.vlines(rake,ymin=ymin,ymax=ymax,colors='g')
+
+            # y, binEdges = np.histogram(df_select[i], bins=100)
+            # bincenters = 0.5 * (binEdges[1:] + binEdges[:-1])
+            # pylab.plot(bincenters, y, '-',label = "%s" % i)
+            ax2.set_title("Density %s"%i,color= 'b')
+            ax2.set_xlabel("N=%i" % (len(df_select[i])))
+            plt.tight_layout()
+            row += 1
+        plt.savefig(dir+ '/Trace_density.pdf')
+
+    def get_pdf(self, filepath, savename, directory, skiprows, column_names,show=True):
         dir = directory + '/%s' % (savename.strip('.yaml'))
         if not os.path.exists(dir):
             os.makedirs(dir)
@@ -151,19 +278,14 @@ class Post_processing_sdr:
                 # parameters = data_file['parameters']
         else:
             # parameters = open(filepath, "r").readlines()[:33]
-            data = np.loadtxt(filepath, delimiter=',', skiprows=70)
+            data = np.loadtxt(filepath, delimiter=',', skiprows=skiprows)
 
         df = pd.DataFrame(data,
-                          columns=["Epicentral_distance", "Depth", "Strike", "Dip", "Rake", "Misfit_accepted",
-                                   "Misfit_rejected", "Acceptance", "Epi_reject", "depth_reject", "Strike_reject",
-                                   "Dip_reject", "Rake_reject"])
-        df_select = df[["Epicentral_distance", "Depth", "Strike", "Dip", "Rake"]]
+                          columns=column_names)
+        df_select = df[["Epi", "Depth", "Strike", "Dip", "Rake"]]
         pdf = Plots()
         for i, value in df_select.iteritems():
-            if i == 'Misfit_accepted' or i == 'Misfit_rejected' or i == 'Acceptance':
-                continue
-            else:
-                pdf.marginal_1D(data=value, name=i, amount_bins=20, directory=dir_pdf, show=show)
+            pdf.marginal_1D(data=value, name=i, amount_bins=20, directory=dir_pdf, show=show)
         for i in itertools.combinations(df_select, 2):
             pdf.marginal_2D(df_select[i[0]], i[0], df_select[i[1]], i[1], amount_bins=20, directory=dir_pdf, show=show)
 
@@ -235,7 +357,7 @@ class Post_processing_sdr:
 
         plt.show()
 
-    def Seaborn_plots(self, filepath, savename, directory, show):
+    def Seaborn_plots(self, filepath, savename, directory, show, skiprows, column_names):
         dir = directory + '/%s' % (savename.strip('.yaml'))
         if not os.path.exists(dir):
             os.makedirs(dir)
@@ -252,23 +374,21 @@ class Post_processing_sdr:
                 # parameters = data_file['parameters']
         else:
             # parameters = open(filepath, "r").readlines()[:33]
-            data = np.loadtxt(filepath, delimiter=',', skiprows=70)
+            data = np.loadtxt(filepath, delimiter=',', skiprows=skiprows)
 
         df = pd.DataFrame(data,
-                          columns=["Epicentral_distance", "Depth", "Strike", "Dip", "Rake", "Misfit_accepted",
-                                   "Misfit_rejected", "Acceptance", "Epi_reject", "depth_reject", "Strike_reject",
-                                   "Dip_reject", "Rake_reject"])
-        df_select = df[["Epicentral_distance", "Depth", "Strike", "Dip", "Rake", "Misfit_accepted"]]
+                          columns=column_names)
+        df_select = df[["Epi", "Depth", "Strike", "Dip", "Rake"]]
 
         plot = Plots()
-        for i in itertools.combinations(df_select, 2):
-            plot.Kernel_density(data=df_select, name_x=i[0], name_y=i[1], directory=dir_seaborn,
-                                savename=savename.strip(".yaml"), show=show)
-            plot.hist(data=df, name_x=i[0], name_y=i[1], directory=dir_seaborn, savename=savename.strip(".yaml"),
-                      show=show)
-            #
-            # ## Pair Grid approximation
-            # plot.Pair_Grid(data=df_select,directory=dir_seaborn,savename=savename.strip(".yaml"))
+        # for i in itertools.combinations(df_select, 2):
+        #     plot.Kernel_density(data=df_select, name_x=i[0], name_y=i[1], directory=dir_seaborn,
+        #                         savename=savename.strip(".yaml"), show=show)
+        #     plot.hist(data=df, name_x=i[0], name_y=i[1], directory=dir_seaborn, savename=savename.strip(".yaml"),
+        #               show=show)
+
+        ## Pair Grid approximation
+        plot.Pair_Grid(data=df_select,directory=dir_seaborn,savename=savename,show=show)
 
     def event_plot(self, la_receiver, lo_receiver, la_source, lo_source):
         la_r = la_receiver

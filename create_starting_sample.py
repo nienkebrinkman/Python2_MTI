@@ -3,7 +3,7 @@ import pandas as pd
 
 def main():
 
-    txt_filepath = '/home/nienke/Documents/Applied_geophysics/Thesis/anaconda/Additional_scripts/Iteration_runs/iter_4_10000.txt'
+    txt_filepath = '/home/nienke/Documents/Applied_geophysics/Thesis/anaconda/Additional_scripts/Iteration_runs/Euler_high_temp.txt'
 
     create = create_starting_sample()
     create.get_sample(txt_filepath)

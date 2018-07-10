@@ -86,8 +86,8 @@ class Create_observed:
     def time_between_windows(self,epi,depth,dt):
         tt_P = self.get_P(epi, depth)  # Estimated P-wave arrival, based on the known velocity model
         tt_S = self.get_S(epi, depth)  # Estimated S-wave arrival, based on the known velocity model
-        p_end = tt_P + 44.2
-        s_start= tt_S -10
+        p_end = tt_P + 20
+        s_start= tt_S -5
         tt_diff=s_start - p_end
         time_between_windows=tt_diff / dt
         return time_between_windows
@@ -104,10 +104,10 @@ class Create_observed:
         for i, trace in enumerate(seis_traces.traces):
             p_time = or_time.timestamp + tt_P
             s_time=or_time.timestamp+tt_S
-            start_time_p = obspy.UTCDateTime(p_time - 10) # -10 , + 44.2 --> PAPER: STAHLER & SIGLOCH
-            end_time_p = obspy.UTCDateTime(p_time + 44.2)
-            start_time_s = obspy.UTCDateTime(s_time - 10)
-            end_time_s = obspy.UTCDateTime(s_time + 44.2)
+            start_time_p = obspy.UTCDateTime(p_time - 5) # -10 , + 44.2 --> PAPER: STAHLER & SIGLOCH
+            end_time_p = obspy.UTCDateTime(p_time + 20)
+            start_time_s = obspy.UTCDateTime(s_time - 5)
+            end_time_s = obspy.UTCDateTime(s_time + 20)
 
             P_trace = Trace.slice(trace, start_time_p, end_time_p)
             # P_trace.detrend(type='demean')

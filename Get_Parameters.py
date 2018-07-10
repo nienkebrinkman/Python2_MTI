@@ -25,8 +25,8 @@ class Get_Paramters:
 
         # Construct the observed data:
         sdr = True # If True: invert Strike/Dip/Rake, If False: invert m_tt,m_pp,m_rr,m_tp,m_rt,m_rp
-        noise = True
-        plot_modus = False # If True: you make seismogram plots during your MCMC algorithm
+        noise = False
+        plot_modus = True # If True: you make seismogram plots during your MCMC algorithm
         temperature = 1
         directory = '/home/nienke/Documents/Applied_geophysics/Thesis/anaconda/Final'
         npts = 2000 # The amount of samples of your seismogram
@@ -123,19 +123,19 @@ class Get_Paramters:
         PRIOR['strike']['range_max'] = 359.9
         PRIOR['dip']['range_min'] = 0
         PRIOR['dip']['range_max'] = 89.9
-        PRIOR['angle_spread'] = 1
+        PRIOR['angle_spread'] = 5
         PRIOR['rake']['range_min'] = -180
         PRIOR['rake']['range_max'] = 179
         PRIOR['rake']['spread'] = 1
 
         PRIOR['depth']['range_min'] = 0
         PRIOR['depth']['range_max'] = 50000
-        PRIOR['depth']['spread'] = 100
+        PRIOR['depth']['spread'] = 1000
         PRIOR['epi']['range_min'] = estimated_epi - 5
         PRIOR['epi']['range_max'] = estimated_epi + 5
         PRIOR['epi']['spread'] = 1
 
-        PRIOR['sample_number'] = 10000
+        PRIOR['sample_number'] = 100
         PRIOR['var_est'] = 0.5
         return PRIOR
 
@@ -165,9 +165,9 @@ class Get_Paramters:
         PARAMETERS['lo_s'] = 90
 
         PARAMETERS['depth_s'] = 10000  # [m]
-        PARAMETERS['strike'] = 79
-        PARAMETERS['dip'] = 50
-        PARAMETERS['rake'] = 20
+        PARAMETERS['strike'] = 79 #79
+        PARAMETERS['dip'] = 50#50
+        PARAMETERS['rake'] = 20#20
 
         PARAMETERS['m_tt'] = 1.81e+22  # 3.81e+15
         PARAMETERS['m_pp'] = -1.74e+24  # -4.74e+17
