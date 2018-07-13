@@ -90,13 +90,13 @@ class Misfit:
             misfit = np.append(misfit, ((CC_s - 0.95) ** 2) / (2 * (0.1) ** 2))# + np.abs(shift))
 
             # misfit = np.append(misfit,((CC - 0.95) ** 2) / (2 * (0.1) ** 2))
-
+            #
             # plt.plot(s_syn_shift_obspy,label='s_syn_shifted_obspy')
             # plt.plot(s_syn[i],label = 's_syn')
-            # plt.plot(s_obs[i],label = 's_obs')
+            # plt.plot(s_obs[i],label = 's_obs',linestyle = ":")
             # plt.legend()
             # plt.show()
-            # plt.close()
+            plt.close()
         # P- correlation
         for i in range(len(p_obs)):
             cc_obspy = cc.correlate(p_obs[i].data, p_syn[i].data, int( 0.25*len(p_obs[i].data)))
@@ -106,7 +106,7 @@ class Misfit:
 
             D_p = 1 - CC_p  # Decorrelation
             time_shift = np.append(time_shift, shift)
-            misfit = np.append(misfit, ((CC_p - 0.95) ** 2) / (2 * (0.1) ** 2)) #+ np.abs(shift))
+            misfit = np.append(misfit, ((CC_p - 0.95) ** 2) / (2 * (0.1) ** 2) )#+ np.abs(shift))
 
             # misfit = np.append(misfit,((CC - 0.95) ** 2) / (2 * (0.1) ** 2))
 

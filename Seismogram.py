@@ -1,6 +1,6 @@
 import instaseis
 import numpy as np
-
+from obspy.core.stream import Stream
 
 class Seismogram:
     def __init__(self, PRIOR, db):
@@ -19,7 +19,7 @@ class Seismogram:
                                                            depth_in_m=depth,
                                                            strike=strike, dip=dip,
                                                            rake=rake, M0=self.prior['M0'],
-                                                           origin_time=time)
+                                                           origin_time=time,dt=2.0)
             return source
         else:
             source = instaseis.Source(latitude=la_s, longitude=lo_s,
@@ -33,6 +33,7 @@ class Seismogram:
         receiver = self.get_receiver()
         traces = self.db.get_seismograms(source=source, receiver=receiver, components=self.prior['components'],
                                          kind=self.prior['kind'])
+        traces.interpolate(sampling_rate = 2.0)
         traces.traces[0].data = np.float64(traces.traces[0].data)
         traces.traces[1].data = np.float64(traces.traces[1].data)
         traces.traces[2].data = np.float64(traces.traces[2].data)

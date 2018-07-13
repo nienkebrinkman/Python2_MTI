@@ -43,7 +43,7 @@ class Source_code:
             zero_trace = Trace(np.zeros(npts),
                         header={"starttime": start_time_p, 'delta': trace.meta.delta, "station": trace.meta.station,
                                 "network": trace.meta.network, "location": trace.meta.location,
-                                "channel": trace.meta.channel, "instaseis": trace.meta.instaseis})
+                                "channel": trace.meta.channel})
             if 'T' in trace.meta.channel:
                 total_trace = zero_trace.__add__(S_trace, method=0, interpolation_samples=0, fill_value=S_trace.data,
                                       sanity_checks=True)
@@ -55,7 +55,7 @@ class Source_code:
                 p_stream.append(total_p_trace)
             s_stream.append(total_s_trace)
             total_stream.append(total_trace)
-        return total_stream,p_stream,s_stream
+        return total_stream,p_stream,s_stream,start_time_p,start_time_s
 
     def stack_BW_SW_Streams(self,traces_BW,traces_RW,traces_LW):
         stack_stream = traces_BW + traces_RW + traces_LW

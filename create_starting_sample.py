@@ -10,6 +10,12 @@ def main():
 
 
 class create_starting_sample:
+    def get_sample_manual(self,epi,depth,strike,dip,rake,savepath):
+        with open(savepath, 'w') as save_file:
+            save_file.write("%.4f,%.4f,%.4f,%.4f,%.4f\n\r" % (epi,depth,strike,dip,rake))
+        save_file.close()
+        print("Txt file with new sample is saved as %s" % savepath)
+        return savepath
 
     def get_sample(self, txt_filepath):
         data = np.loadtxt(txt_filepath, delimiter=',', skiprows=70)

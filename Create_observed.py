@@ -8,8 +8,7 @@ from obspy.core.trace import Trace
 import matplotlib.pylab as plt
 
 class Create_observed:
-    def __init__(self, PRIOR,PARAMETERS, db):
-        self.par = PARAMETERS
+    def __init__(self, PRIOR, db):
         self.prior = PRIOR
         self.db = db
         self.veloc_model = self.prior['VELOC_taup']
@@ -25,7 +24,7 @@ class Create_observed:
                                                            depth_in_m=depth,
                                                            strike=strike, dip=dip,
                                                            rake=rake, M0=self.prior['M0'],
-                                                           origin_time=time)
+                                                           origin_time=time,dt = 2.0)
             return source
         else:
             source = instaseis.Source(latitude=la_s, longitude=lo_s,
@@ -34,20 +33,21 @@ class Create_observed:
                                            m_rr=m_rr, origin_time=time)
             return source
 
-    def get_seis_automatic(self, prior, noise_model=False, sdr=False):
+    def get_seis_automatic(self, parameters,prior, noise_model=False, sdr=False):
         self.prior = prior
         if sdr == True:
-            source = self.get_source(la_s=self.par['la_s'], lo_s=self.par['lo_s'], depth=self.par['depth_s'],
-                                     strike=self.par['strike'], dip=self.par['dip'], rake=self.par['rake'],
-                                     time=self.par['origin_time'], sdr=sdr)
+            source = self.get_source(la_s=parameters['la_s'], lo_s=parameters['lo_s'], depth=parameters['depth_s'],
+                                     strike=parameters['strike'], dip=parameters['dip'], rake=parameters['rake'],
+                                     time=parameters['origin_time'], sdr=sdr)
         else:
-            source = self.get_source(la_s=self.par['la_s'], lo_s=self.par['lo_s'], depth=self.par['depth_s'],
-                                     m_tp=self.par['m_tp'], m_rp=self.par['m_rp'], m_rt=self.par['m_rt'],
-                                     m_pp=self.par['m_pp'], m_tt=self.par['m_tt'], m_rr=self.par['m_rr'],
-                                     time=self.par['origin_time'], sdr=sdr)
+            source = self.get_source(la_s=parameters['la_s'], lo_s=parameters['lo_s'], depth=parameters['depth_s'],
+                                     m_tp=parameters['m_tp'], m_rp=parameters['m_rp'], m_rt=parameters['m_rt'],
+                                     m_pp=parameters['m_pp'], m_tt=parameters['m_tt'], m_rr=parameters['m_rr'],
+                                     time=parameters['origin_time'], sdr=sdr)
         receiver = self.get_receiver()
         traces = self.db.get_seismograms(source=source, receiver=receiver, components=self.prior['components'],
                                          kind=self.prior['kind'])
+        traces.interpolate(sampling_rate=2.0)
         traces.traces[0].data = np.float64(traces.traces[0].data)
         traces.traces[1].data = np.float64(traces.traces[1].data)
         traces.traces[2].data = np.float64(traces.traces[2].data)
@@ -74,10 +74,10 @@ class Create_observed:
 
         return tt[0].time
 
-    def get_receiver_time(self, epi, depth, d_obs_traces):
+    def get_receiver_time(self, epi, depth,origin_time):
         tt_P = self.get_P(epi, depth)  # Estimated P-wave arrival, based on the known velocity model
         tt_window = tt_P -10
-        time_at_receiver = obspy.UTCDateTime(self.par['origin_time'].timestamp + tt_window)
+        time_at_receiver = obspy.UTCDateTime(origin_time.timestamp + tt_window)
         # TODO plot the reference time on the actual d_obs
         # plt.plot(d_obs_traces[0])
         # plt.plot()
@@ -117,7 +117,7 @@ class Create_observed:
             zero_trace = Trace(np.zeros(npts),
                         header={"starttime": start_time_p, 'delta': trace.meta.delta, "station": trace.meta.station,
                                 "network": trace.meta.network, "location": trace.meta.location,
-                                "channel": trace.meta.channel, "instaseis": trace.meta.instaseis})
+                                "channel": trace.meta.channel})
             if 'T' in trace.meta.channel:
                 total_trace = zero_trace.__add__(S_trace, method=0, interpolation_samples=0, fill_value=S_trace.data,
                                       sanity_checks=True)

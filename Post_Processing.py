@@ -12,6 +12,7 @@ import mplstereonet
 import yaml
 from obspy.imaging.beachball import aux_plane
 import pylab
+import obspy
 
 from Get_Parameters import Get_Paramters
 
@@ -20,16 +21,19 @@ def main():
     ## Post - Processing [processing the results from inversion]
     result = Post_processing_sdr()
 
-    directory = '/home/nienke/Documents/Applied_geophysics/Thesis/anaconda/Final'
-    path_to_file = '/home/nienke/Documents/Applied_geophysics/Thesis/anaconda/Final/small_window_reject.txt'
+    directory = '/home/nienke/Documents/Applied_geophysics/Thesis/anaconda/Euler_data'
+    path_to_file = '/home/nienke/Documents/Applied_geophysics/Thesis/anaconda/Euler_data/close_small_spread_reject.txt'
+    # path_to_stream = '/home/nienke/Documents/Applied_geophysics/Thesis/anaconda/Blindtest/bw_copy.mseed'
     # path= '/home/nienke/Documents/Applied_geophysics/Thesis/anaconda/Additional_scripts/Iteration_runs/Together'
 
     savename = 'Trials'
     show = False  # Choose True for direct show, choose False for saving
     skiprows = 70
-    column_names= ["Epi", "Depth", "Strike", "Dip", "Rake", "Total_misfit","S_z","S_r","S_t","P_z","P_r","BW_misfit","R_1","R_2","R_3","R_4","R_tot","L_1","L_2","L_3","L_4","L_tot","Acceptance"]
+    column_names= ["Epi", "Depth", "Strike", "Dip", "Rake", "Total_misfit","S_z","S_r","S_t","P_z","P_r","BW_misfit","Rtot","Ltot"]
     # path_to_file, save = result.convert_txt_folder_to_yaml(path, savename)
     # result.get_stereonets(filepath=path_to_file, savename=savename, directory=directory, show=show)
+
+    # result.plot_streams(path_to_stream)
 
     result.trace_density(filepath=path_to_file, savename=savename, directory=directory, skiprows=skiprows, column_names=column_names,show=show)
     # result.get_accepted_samples(filepath=path_to_file,savename=savename,directory=directory, column_names,skiprows=skiprows)
@@ -95,17 +99,28 @@ class Post_processing_sdr:
         else:
             # parameters = open(filepath, "r").readlines()[:33]
             data = np.loadtxt(filepath, delimiter=',', skiprows=skiprows)
+        length = len(data[0]) - (len(column_names) + 3)
+        R_length = int(data[0][-2])
+        L_length = int(data[0][-1])
+
+        for i in range(R_length):
+            column_names = np.append(column_names,"R_%i" % (i+1))
+        for i in range(L_length):
+            column_names = np.append(column_names,"L_%i" % (i+1))
+        column_names = np.append(column_names,"Accepted")
+        column_names = np.append(column_names,"Rayleigh_length")
+        column_names = np.append(column_names,"Love_length")
 
         df = pd.DataFrame(data,
                           columns=column_names)
-        total = len(df["Acceptance"])
-        accepted = np.sum(df["Acceptance"]==1)
+        total = len(df["Accepted"])
+        accepted = np.sum(df["Accepted"]==1)
         savepath = dir + '/Accept_%i_outof_%i.txt' % (accepted,total)
         with open(savepath, 'w') as save_file:
             save_file.write("%i,%i\n\r" % (total,accepted))
         save_file.close()
-        print("Total amount of samples = %i" % len(df["Acceptance"]))
-        print("Total amount of accepted samples = %i" % np.sum(df["Acceptance"]==1))
+        print("Total amount of samples = %i" % len(df["Accepted"]))
+        print("Total amount of accepted samples = %i" % np.sum(df["Accepted"]==1))
 
     def get_convergence(self, filepath, savename, directory,skiprows, column_names,show=True):
         dir = directory + '/%s' % (savename)
@@ -121,6 +136,18 @@ class Post_processing_sdr:
         else:
             # parameters = open(filepath, "r").readlines()[:33]
             data = np.loadtxt(filepath, delimiter=',', skiprows=skiprows)
+
+        length = len(data[0]) - (len(column_names) + 3)
+        R_length =4# int(data[0][-2])
+        L_length =4# int(data[0][-1])
+
+        for i in range(R_length):
+            column_names = np.append(column_names,"R_%i" % (i+1))
+        for i in range(L_length):
+            column_names = np.append(column_names,"L_%i" % (i+1))
+        column_names = np.append(column_names,"Accepted")
+        # column_names = np.append(column_names,"Rayleigh_length")
+        # column_names = np.append(column_names,"Love_length")
         #
         df = pd.DataFrame(data,
                           columns=column_names)
@@ -129,6 +156,7 @@ class Post_processing_sdr:
         plt.figure(1)
         ax = plt.subplot(111)
         ax.plot(np.arange(0, len(df['Total_misfit'])), df['Total_misfit'])
+        plt.yscale('log')
         plt.xlabel('Iteration')
         plt.ylabel('-Log(likelihood)')
         ax.invert_yaxis()
@@ -155,6 +183,17 @@ class Post_processing_sdr:
         else:
             # parameters = open(filepath, "r").readlines()[:33]
             data = np.loadtxt(filepath, delimiter=',', skiprows=skiprows)
+        length = len(data[0]) - (len(column_names) + 3)
+        R_length = 4#int(data[0][-2])
+        L_length = 4#int(data[0][-1])
+
+        for i in range(R_length):
+            column_names = np.append(column_names,"R_%i" % (i+1))
+        for i in range(L_length):
+            column_names = np.append(column_names,"L_%i" % (i+1))
+        column_names = np.append(column_names,"Accepted")
+        # column_names = np.append(column_names,"Rayleigh_length")
+        # column_names = np.append(column_names,"Love_length")
 
         df = pd.DataFrame(data,
                           columns=column_names)
@@ -176,7 +215,10 @@ class Post_processing_sdr:
         ax3.plot(df_select['Rake'], label = "Rake")
         plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
         plt.tight_layout()
-        df_select_xi = df[["Total_misfit","S_z","S_r","S_t","P_z","P_r","BW_misfit","R_1","R_2","R_3","R_4","R_tot","L_1","L_2","L_3","L_4","L_tot"]]
+
+        R_select = df.filter(like='R_')
+        L_select = df.filter(like='L_')
+        df_select_xi = df[["Total_misfit","S_z","S_r","S_t","P_z","P_r","BW_misfit","Rtot","Ltot"]]
         ax4 = plt.subplot2grid((5, 2), (2, 0), colspan=2)
         ax4.plot(df_select_xi['Total_misfit'], label = "Total_misfit")
         ax4.plot(df_select_xi['S_z'], label = "S_z")
@@ -185,22 +227,25 @@ class Post_processing_sdr:
         ax4.plot(df_select_xi['P_z'], label = "P_z")
         ax4.plot(df_select_xi['P_r'], label = "P_r")
         ax4.plot(df_select_xi['BW_misfit'], label = "BW_tot")
+        ymin, ymax = ax4.get_ylim()
+        plt.yscale('log')
+        plt.ylim((pow(10, -4), pow(10, 4)))
         plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
         plt.tight_layout()
         ax5=plt.subplot2grid((5,2),(3,0),colspan=2)
-        ax5.plot(df_select_xi['R_1'], label = "R_1")
-        ax5.plot(df_select_xi['R_2'], label = "R_2")
-        ax5.plot(df_select_xi['R_3'], label = "R_3")
-        ax5.plot(df_select_xi['R_4'], label = "R_4")
-        ax5.plot(df_select_xi['R_tot'], label = "R_tot")
+        for i in R_select:
+            ax5.plot(R_select[i],label = i)
+        ax5.plot(df_select_xi['Rtot'], label = "Rtot")
+        plt.yscale('log')
+        plt.ylim((pow(10, -4), pow(10, 4)))
         plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
         plt.tight_layout()
         ax6 = plt.subplot2grid((5,2),(4,0),colspan=2)
-        ax6.plot(df_select_xi['L_1'], label = "L_1")
-        ax6.plot(df_select_xi['L_2'], label = "L_2")
-        ax6.plot(df_select_xi['L_3'], label = "L_3")
-        ax6.plot(df_select_xi['L_4'], label = "L_4")
-        ax6.plot(df_select_xi['L_tot'], label = "L_tot")
+        for i in L_select:
+            ax6.plot(L_select[i],label = i)
+        ax6.plot(df_select_xi['Ltot'], label = "Ltot")
+        plt.yscale('log')
+        plt.ylim((pow(10, -4), pow(10, 4)))
         plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
         plt.tight_layout()
         plt.savefig(dir+'/combined_all_par.pdf')
@@ -220,6 +265,18 @@ class Post_processing_sdr:
         else:
             # parameters = open(filepath, "r").readlines()[:33]
             data = np.loadtxt(filepath, delimiter=',', skiprows=skiprows)
+
+        length = len(data[0]) - (len(column_names) + 3)
+        R_length = 4#int(data[0][-2])
+        L_length = 4#int(data[0][-1])
+
+        for i in range(R_length):
+            column_names = np.append(column_names,"R_%i" % (i+1))
+        for i in range(L_length):
+            column_names = np.append(column_names,"L_%i" % (i+1))
+        column_names = np.append(column_names,"Accepted")
+        # column_names = np.append(column_names,"Rayleigh_length")
+        # column_names = np.append(column_names,"Love_length")
         #
         df = pd.DataFrame(data,
                           columns=column_names)
@@ -279,6 +336,17 @@ class Post_processing_sdr:
         else:
             # parameters = open(filepath, "r").readlines()[:33]
             data = np.loadtxt(filepath, delimiter=',', skiprows=skiprows)
+        length = len(data[0]) - (len(column_names) + 3)
+        R_length = int(data[0][-2])
+        L_length = int(data[0][-1])
+
+        for i in range(R_length):
+            column_names = np.append(column_names,"R_%i" % (i+1))
+        for i in range(L_length):
+            column_names = np.append(column_names,"L_%i" % (i+1))
+        column_names = np.append(column_names,"Accepted")
+        # column_names = np.append(column_names,"Rayleigh_length")
+        # column_names = np.append(column_names,"Love_length")
 
         df = pd.DataFrame(data,
                           columns=column_names)
@@ -375,6 +443,17 @@ class Post_processing_sdr:
         else:
             # parameters = open(filepath, "r").readlines()[:33]
             data = np.loadtxt(filepath, delimiter=',', skiprows=skiprows)
+        length = len(data[0]) - (len(column_names) + 3)
+        R_length = int(data[0][-2])
+        L_length = int(data[0][-1])
+
+        for i in range(R_length):
+            column_names = np.append(column_names,"R_%i" % (i+1))
+        for i in range(L_length):
+            column_names = np.append(column_names,"L_%i" % (i+1))
+        column_names = np.append(column_names,"Accepted")
+        column_names = np.append(column_names,"Rayleigh_length")
+        column_names = np.append(column_names,"Love_length")
 
         df = pd.DataFrame(data,
                           columns=column_names)
@@ -414,6 +493,15 @@ class Post_processing_sdr:
                 ax2.plot(v['trace_r'], alpha=0.2)
                 ax3.plot(v['trace_t'], alpha=0.2)
             plt.show()
+
+    def plot_streams(self,stream_filepath):
+        st = obspy.read(stream_filepath)
+        for i in st.traces:
+            if "Z" in i.meta.channel:
+                a=1
+
+
+
 
     def write_to_dict(self, list_of_parameters):
         parameters = {

@@ -115,8 +115,6 @@ class Surface_waves:
             trial = Z_trace.copy()
             if filter == True:
                 trial.detrend(type="demean")
-                # trial.interpolate(
-                #     sampling_rate=10. / phases[i]['dt'])  # No method specified, so : 'weighted_average_slopes' is used
                 trial.filter('highpass', freq=phases[i]['fmin'], zerophase=True)
                 trial.filter('lowpass', freq=phases[i]['fmax'], zerophase=True)
                 trial.detrend()
@@ -126,11 +124,6 @@ class Surface_waves:
                     (phases[i]['starttime'](dist, depth).timestamp - time_at_rec.timestamp) / trial.stats.delta)
                 end_vline = int(
                     (phases[i]['endtime'](dist, depth).timestamp - time_at_rec.timestamp) /trial.stats.delta)
-                # start_vline = int(
-                #     ((phases[i]['starttime']+phases[i]['t_low']).timestamp - time_at_rec.timestamp) / trial.stats.delta)
-                # end_vline = int(
-                #     ((phases[i]['starttime']+phases[i]['t_high']).timestamp - time_at_rec.timestamp) / trial.stats.delta)
-
                 plt.figure(4)
                 ax = plt.subplot(111)
                 plt.plot(trial.data, alpha=0.5)
@@ -143,21 +136,19 @@ class Surface_waves:
                 # plt.show()
                 plt.close()
 
-            trial.trim(starttime=phases[i]['starttime'](dist, depth), endtime=phases[i]['endtime'](dist, depth))
-            # trial.trim(starttime=phases[i]['starttime']+phases[i]['t_low'], endtime=phases[i]['starttime']+phases[i]['t_high'])
-
-
             if filter == True:
                 trial.detrend(type="demean")
                 env = envelope(trial.data)
-                analytical_signal = hilbert(trial.data)
-                amplitude_envelope = np.abs(analytical_signal)
+                trial.data = env
+                trial.trim(starttime=phases[i]['starttime'](dist, depth), endtime=phases[i]['endtime'](dist, depth))
+
             else:
                 env = trial.data
             if plot_modus == True:
                 plt.figure(5)
-                plt.plot(trial)
-                plt.plot(env)
+                plt.plot(trial,label = '%s' % phases[i]['name'])
+                plt.legend()
+                plt.tight_layout()
                 plt.savefig(dir_phases + '/Rayleigh_envelope_filter_%s.pdf' % phases[i]['name'])
                 # plt.show()
                 plt.close()
@@ -166,15 +157,10 @@ class Surface_waves:
                                header={"starttime": phases[i]['starttime'](dist, depth), 'delta': trial.meta.delta,
                                        "station": trial.meta.station,
                                        "network": trial.meta.network, "location": trial.meta.location,
-                                       "channel": phases[i]['name'], "instaseis": trial.meta.instaseis})
-            env_trace = Trace(env,
-                              header={"starttime": phases[i]['starttime'](dist, depth), 'delta': trial.meta.delta,
-                                      "station": trial.meta.station,
-                                      "network": trial.meta.network, "location": trial.meta.location,
-                                      "channel": phases[i]['name'], "instaseis": trial.meta.instaseis})
-            total_trace = zero_trace.__add__(env_trace, method=0, interpolation_samples=0,
-                                             fill_value=env_trace.data,
-                                             sanity_checks=True)
+                                       "channel": phases[i]['name']})
+            total_trace = zero_trace.__add__(trial, method=0, interpolation_samples=0,
+                                             fill_value=trial.data,
+                                             sanity_checks=False)
             Rayleigh_st.append(total_trace)
         if plot_modus == True:
             plt.figure(6)
@@ -183,8 +169,9 @@ class Surface_waves:
             plt.plot(Rayleigh_st.traces[2].data, label='%s' % Rayleigh_st.traces[2].meta.channel)
             plt.plot(Rayleigh_st.traces[3].data, label='%s' % Rayleigh_st.traces[3].meta.channel)
             plt.legend()
+            plt.tight_layout()
             plt.savefig(dir_R + '/diff_Rayleigh_freq.pdf')
-            plt.close
+            plt.close()
         return Rayleigh_st
 
     def love_pick(self, T_trace, la_s, lo_s, depth, save_directory, time_at_rec, npts, filter = True, plot_modus= False):
@@ -219,8 +206,6 @@ class Surface_waves:
             trial = T_trace.copy()
             if filter == True:
                 trial.detrend(type="demean")
-                trial.interpolate(
-                    sampling_rate=10. / phases[i]['dt'])  # No method specified, so : 'weighted_average_slopes' is used
                 trial.filter('highpass', freq=phases[i]['fmin'], zerophase=True)
                 trial.filter('lowpass', freq=phases[i]['fmax'], zerophase=True)
                 trial.detrend()
@@ -241,20 +226,18 @@ class Surface_waves:
                 plt.tight_layout()
                 plt.close()
 
-            trial.trim(starttime=phases[i]['starttime'](dist, depth), endtime=phases[i]['endtime'](dist, depth))
-
             if filter == True:
                 trial.detrend(type="demean")
                 env = envelope(trial.data)
-                analytical_signal = hilbert(trial.data)
-                amplitude_envelope = np.abs(analytical_signal)
+                trial.data = env
+                trial.trim(starttime=phases[i]['starttime'](dist, depth), endtime=phases[i]['endtime'](dist, depth))
             else:
                 env = trial.data
             if plot_modus == True:
                 plt.figure(2)
-                plt.plot(trial)
-                plt.plot(env)
-                plt.plot(amplitude_envelope, ':')
+                plt.plot(trial,label = '%s' % phases[i]['name'])
+                plt.legend()
+                plt.tight_layout()
                 plt.savefig(dir_phases + '/Love_envelope_filter_%s.pdf' % phases[i]['name'])
                 plt.close()
 
@@ -262,16 +245,11 @@ class Surface_waves:
                                header={"starttime": phases[i]['starttime'](dist, depth), 'delta': trial.meta.delta,
                                        "station": trial.meta.station,
                                        "network": trial.meta.network, "location": trial.meta.location,
-                                       "channel": phases[i]['name'], "instaseis": trial.meta.instaseis})
-            env_trace = Trace(env,
-                              header={"starttime": phases[i]['starttime'](dist, depth), 'delta': trial.meta.delta,
-                                      "station": trial.meta.station,
-                                      "network": trial.meta.network, "location": trial.meta.location,
-                                      "channel": phases[i]['name'], "instaseis": trial.meta.instaseis})
+                                       "channel": phases[i]['name']})
 
-            total_trace = zero_trace.__add__(env_trace, method=0, interpolation_samples=0,
-                                             fill_value=env_trace.data,
-                                             sanity_checks=True)
+            total_trace = zero_trace.__add__(trial, method=0, interpolation_samples=0,
+                                             fill_value=trial.data,
+                                             sanity_checks=False)
 
             Love_st.append(total_trace)
         if plot_modus == True:
@@ -281,8 +259,9 @@ class Surface_waves:
             plt.plot(Love_st.traces[2].data, label='%s' % Love_st.traces[2].meta.channel)
             plt.plot(Love_st.traces[3].data, label='%s' % Love_st.traces[3].meta.channel)
             plt.legend()
+            plt.tight_layout()
             plt.savefig(dir_L + '/diff_Love_freq.pdf')
-            plt.close
+            plt.close()
         return Love_st
 
     def filter(self,stream,time_at_rec,la_s,lo_s,depth,Rayleigh = True):
