@@ -33,10 +33,20 @@ class Plots:
 
         m.warpimage(mars_dir)
         mstatlon, mstatlat = m(lo_r, la_r)
-        m.plot(mstatlon, mstatlat, 'k^', markersize=8)
+        m.plot(mstatlon, mstatlat, 'k^', markersize=10)
 
         EQlon, EQlat = m(lo_s, la_s)
-        m.plot(EQlon, EQlat, 'r*', markersize=10, zorder=10)
+        m.plot(EQlon, EQlat, 'ro', markersize=4.6**2, zorder=10,markeredgecolor= 'k')
+
+        #Blindtest dataset 3.5:
+
+        Blind1lon, Blind1lat = m(210.047795358, 27.8640470986)
+        m.plot(Blind1lon, Blind1lat, 'ro', markersize=3.5**2 , zorder=10,markeredgecolor= 'k')
+
+        # Blindtest dataset 5.0:
+        Blind2lon, Blind2lat = m(103.830554149, -10.0887531193)
+        m.plot(Blind2lon, Blind2lat, 'ro', markersize=5.0**2 , zorder=10,markeredgecolor= 'k')
+
         plt.show()
 
 

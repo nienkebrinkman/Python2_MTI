@@ -14,12 +14,13 @@ from Seismogram import Seismogram
 from Misfit import Misfit
 from Surface_waves import Surface_waves
 from Blindtest import Blindtest
+from KBHit import KBHit
 
 
 class MCMC_stream:
     def __init__(self, R_env_obs, L_env_obs, total_traces_obs, P_traces_obs, S_traces_obs, PRIOR, db,
-                 specification_values, time_at_receiver, start_sample_path=None, picked_events=None,
-                 full_obs_trace=None, P_start=None, S_start=None):
+                 specification_values, time_at_receiver, P_start, S_start, start_sample_path=None, picked_events=None,
+                 full_obs_trace=None):
         # specification values is a dict of the following, See Get_Parameters.py to see the form of values:
         self.blind = specification_values['blind']
         self.sdr = specification_values['sdr']
@@ -31,6 +32,8 @@ class MCMC_stream:
         self.noise = specification_values['noise']
         self.npts = specification_values['npts']
 
+        self.S_start = S_start
+        self.P_Start = P_start
         self.R_env_obs = R_env_obs
         self.L_env_obs = L_env_obs
         self.total_tr_obs = total_traces_obs
@@ -42,8 +45,7 @@ class MCMC_stream:
             pass
         else:
             self.full_obs_trace = full_obs_trace
-            self.S_start = S_start
-            self.P_Start = P_start
+
 
         # General parameters:
         self.dt = total_traces_obs[0].meta.delta
@@ -78,6 +80,8 @@ class MCMC_stream:
                 epi_sample = epi_old
                 depth_sample = depth_old
         return epi_sample, depth_sample
+
+        # return 35.2068855191, 16848.1405882
 
     def model_samples_sdr(self, strike_old=None, dip_old=None, rake_old=None):
         if strike_old == None or dip_old == None or rake_old == None:
@@ -161,17 +165,31 @@ class MCMC_stream:
                 rake = rake_old
         return strike, dip, rake
 
-    def G_function(self, epi, depth, moment_old=None):
-        dict = geo.Geodesic(a=self.prior['radius'], f=0).ArcDirect(lat1=self.prior['la_r'], lon1=self.prior['lo_r'],
-                                                                   azi1=self.prior['baz'],
-                                                                   a12=epi, outmask=1929)
+    def G_function(self, epi, depth, M0,moment_old=None):
         if moment_old is None:
             strike, dip, rake = self.model_samples_sdr()
         else:
             strike, dip, rake = self.model_samples_sdr(moment_old[0], moment_old[1], moment_old[2])
+        # epi =45.9233274286
+        # depth = 10000
+        # strike = 79
+        # dip = 50
+        # rake = 20
+        # strike = moment_old[0]
+        # dip = moment_old[1]
+        # rake = moment_old[2]
+
+        # epi = 35.2068855191
+        # depth = 16848.1405882
+
+
+        dict = geo.Geodesic(a=self.prior['radius'], f=0).ArcDirect(lat1=self.prior['la_r'], lon1=self.prior['lo_r'],
+                                                                   azi1=self.prior['baz'],
+                                                                   a12=epi, outmask=1929)
         d_syn, traces_syn, sources = self.seis.get_seis_manual(la_s=dict['lat2'], lo_s=dict['lon2'], depth=depth,
                                                                strike=strike, dip=dip, rake=rake,
-                                                               time=self.time_at_rec, sdr=self.sdr)
+                                                               time=self.time_at_rec, M0=M0,sdr=self.sdr)
+        # 3.16227766016798e+16
         if self.blind == True:
             R_env_syn, L_env_syn = self.BT.pick_sw(traces_syn, self.picks, epi, self.prior, 30000, self.directory,
                                                    plot_modus=False)
@@ -182,49 +200,50 @@ class MCMC_stream:
             L_env_syn = self.SW.love_pick(T_trace=traces_syn.traces[2], la_s=dict['lat2'], lo_s=dict['lon2'],
                                           depth=depth, save_directory=self.directory, time_at_rec=self.time_at_rec,
                                           npts=self.npts, plot_modus=False)
-        traces_syn.plot(outfile=self.directory + '/syntethic')
+        # traces_syn.plot(outfile=self.directory + '/syntethic')
         total_syn, p_syn, s_syn, start_time_p, start_time_s = self.window.get_window_obspy(traces_syn, epi, depth,
                                                                                            self.time_at_rec, self.npts)
+        #
+        # plot_obs = self.full_obs_trace.copy()
+        # plot_obs.trim(traces_syn.traces[0].meta.starttime, traces_syn.traces[0].meta.endtime)
+        # if self.iter % 10 == 0:
+        #     for i in range(len(self.full_obs_trace)):
+        #         subplot_no = len(self.full_obs_trace) * 100 + 10 + i + 1
+        #         if i < 3:
+        #             P_obs = int(
+        #                 (self.P_Start.timestamp - traces_syn.traces[
+        #                     i].meta.starttime.timestamp) / traces_syn.traces[i].meta.delta)
+        #             P_syn = int(
+        #                 (start_time_p.timestamp - traces_syn.traces[
+        #                     i].meta.starttime.timestamp) / traces_syn.traces[i].meta.delta)
+        #         S_obs = int(
+        #             (self.S_start.timestamp - traces_syn.traces[
+        #                 i].meta.starttime.timestamp) / traces_syn.traces[i].meta.delta)
+        #
+        #         S_syn = int(
+        #             (start_time_s.timestamp - traces_syn.traces[
+        #                 i].meta.starttime.timestamp) / traces_syn.traces[i].meta.delta)
+        #         ax = plt.subplot(subplot_no)
+        #         plt.plot(plot_obs.traces[i].data, alpha=0.5, c='k', linewidth=0.3)
+        #         plt.plot(traces_syn.traces[i].data, alpha=0.5, c='r', linewidth=0.3)
+        #         ymin, ymax = ax.get_ylim()
+        #         if i < 3:
+        #             plt.vlines([P_obs], ymin, ymax, label="Observed", colors='k', linewidth=0.3)
+        #             plt.vlines([P_syn], ymin, ymax, label="synthetic", colors='r', linewidth=0.3)
+        #         plt.vlines([S_obs], ymin, ymax, label="Observed", colors='k', linewidth=0.3)
+        #         plt.vlines([S_syn], ymin, ymax, label="synthetic", colors='r', linewidth=0.3)
+        #         plt.xlabel(self.time_at_rec.strftime('%Y-%m-%dT%H:%M:%S + sec'))
+        #         plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        #         plt.tight_layout()
+        #
+        #     # plt.savefig(self.directory + '/P_S_Picks_%i.pdf' %self.iter)
+        #     plt.show()
+        #     plt.close()
 
-        plot_obs = self.full_obs_trace.copy()
-        plot_obs.trim(traces_syn.traces[0].meta.starttime, traces_syn.traces[0].meta.endtime)
-        if self.iter % 10 == 0:
-            for i in range(len(self.full_obs_trace)):
-                subplot_no = len(self.full_obs_trace) * 100 + 10 + i + 1
-                if i < 3:
-                    P_obs = int(
-                        (self.P_Start.timestamp - traces_syn.traces[
-                            i].meta.starttime.timestamp) / traces_syn.traces[i].meta.delta)
-                    P_syn = int(
-                        (start_time_p.timestamp - traces_syn.traces[
-                            i].meta.starttime.timestamp) / traces_syn.traces[i].meta.delta)
-                S_obs = int(
-                    (self.S_start.timestamp - traces_syn.traces[
-                        i].meta.starttime.timestamp) / traces_syn.traces[i].meta.delta)
-
-                S_syn = int(
-                    (start_time_s.timestamp - traces_syn.traces[
-                        i].meta.starttime.timestamp) / traces_syn.traces[i].meta.delta)
-                ax = plt.subplot(subplot_no)
-                plt.plot(plot_obs.traces[i].data, alpha=0.5, c='k', linewidth=0.3)
-                plt.plot(traces_syn.traces[i].data, alpha=0.5, c='r', linewidth=0.3)
-                ymin, ymax = ax.get_ylim()
-                if i < 3:
-                    plt.vlines([P_obs], ymin, ymax, label="Observed", colors='k', linewidth=0.3)
-                    plt.vlines([P_syn], ymin, ymax, label="synthetic", colors='r', linewidth=0.3)
-                plt.vlines([S_obs], ymin, ymax, label="Observed", colors='k', linewidth=0.3)
-                plt.vlines([S_syn], ymin, ymax, label="synthetic", colors='r', linewidth=0.3)
-                plt.xlabel(self.time_at_rec.strftime('%Y-%m-%dT%H:%M:%S + sec'))
-                plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-                plt.tight_layout()
-
-            plt.savefig(self.directory + '/P_S_Picks_%i.pdf' %i)
-            # plt.show()
-            plt.close()
-
-        return R_env_syn, L_env_syn, total_syn, p_syn, s_syn, np.array([strike, dip, rake])
+        return R_env_syn, L_env_syn, total_syn, p_syn, s_syn, np.array([strike, dip, rake]), start_time_p
 
     def start_MCMC(self, savepath):
+        # kb = KBHit()
         savepath_reject = savepath.replace('.txt', '_reject.txt')
         savepath_shift = savepath.replace('.txt', '_shift.txt')
         with open(savepath_shift, 'w') as shift_file:
@@ -238,11 +257,13 @@ class MCMC_stream:
                         if i % 10 == 0:
                             print("proposal: %i, accepted: %i" % (i, accepted))
                             print("proposal: %i, rejected: %i" % (i, rejected))
+                            # self.full_obs_trace.traces[0].plot()
 
                         if i == 0 or self.MCMC == 'MH':
                             if self.start_sample == None:
                                 epi, depth = self.model_samples()
-                                R_env_syn, L_env_syn, total_syn, p_syn, s_syn, moment = self.G_function(epi, depth)
+                                M0_old = self.prior['M0']
+                                R_env_syn, L_env_syn, total_syn, p_syn, s_syn, moment, P_start = self.G_function(epi, depth, self.prior['M0'])
                             else:
                                 if self.rnd_par == True:
                                     self.update = 'epi'
@@ -252,8 +273,8 @@ class MCMC_stream:
                                 epi = data[0]
                                 depth = data[1]
                                 moment_old = np.array([data[2], data[3], data[4]])
-                                R_env_syn, L_env_syn, total_syn, p_syn, s_syn, moment = self.G_function(epi, depth,
-                                                                                                        moment_old)
+                                M0_old = self.prior['M0']
+                                R_env_syn, L_env_syn, total_syn, p_syn, s_syn, moment, P_start = self.G_function(epi, depth,self.prior['M0'],moment_old)
 
                         else:
                             if self.rnd_par == True:
@@ -264,47 +285,43 @@ class MCMC_stream:
                             if epi < self.prior['epi']['range_min'] or epi > self.prior['epi']['range_max'] or depth < \
                                     self.prior['depth']['range_min'] or depth > self.prior['depth']['range_max']:
                                 continue
-                            R_env_syn, L_env_syn, total_syn, p_syn, s_syn, moment = self.G_function(epi, depth,
-                                                                                                    moment_old)
 
-                        if self.xi == 'L2':
-                            Xi_bw, time_shift_new = self.misfit.L2_stream(self.p_tr_obs, p_syn, self.s_tr_obs, s_syn,
-                                                                          self.time_at_rec, self.prior['var_est'])
-                            Xi_R = self.misfit.SW_L2(self.R_env_obs, R_env_syn, self.prior['var_est'])
-                            Xi_L = self.misfit.SW_L2(self.L_env_obs, L_env_syn, self.prior['var_est'])
-                            Xi_new = Xi_bw + Xi_R + Xi_L
-                        elif self.xi == 'CC':
-                            Xi_bw_new, time_shift_new = self.misfit.CC_stream(self.p_tr_obs, p_syn, self.s_tr_obs,
-                                                                              s_syn,
-                                                                              self.time_at_rec)
-                            shift_file.write("%.4f,%.4f,%.4f,%.4f,%.4f\n" % (
-                            time_shift_new[0], time_shift_new[1], time_shift_new[2], time_shift_new[3],
-                            time_shift_new[4]))
-                            s_z_new = 0.1 * Xi_bw_new[0]
-                            s_r_new = 0.1 * Xi_bw_new[1]
-                            s_t_new = 5 * Xi_bw_new[2]
-                            p_z_new = 5 * Xi_bw_new[3]
-                            p_r_new = 5 * Xi_bw_new[4]
-                            bw_new = s_z_new + s_r_new + s_t_new + p_z_new + p_r_new
-                            Xi_R_new = self.misfit.SW_L2(self.R_env_obs, R_env_syn, self.prior['var_est'])
-                            R_dict_new = {}
-                            rw_new = 0
-                            for j, v in enumerate(Xi_R_new):
-                                R_dict_new.update({'R_%i_new' % j: 0.1*v})
-                                rw_new += v
+                            R_env_syn, L_env_syn, total_syn, p_syn, s_syn, moment, P_start = self.G_function(epi, depth, M0_old, moment_old)
 
-                            Xi_L_new = self.misfit.SW_L2(self.L_env_obs, L_env_syn, self.prior['var_est'])
-                            L_dict_new = {}
-                            lw_new = 0
-                            for j, v in enumerate(Xi_L_new):
-                                L_dict_new.update({'L_%i_new' % j: 0.1*v})
-                                lw_new += v
-                            Xi_new = bw_new + rw_new + lw_new
-                        else:
-                            raise ValueError(
-                                'misfit is not specified correctly, choose either: L2 or CC in string format')
+
+                        Xi_bw_new, time_shift_new, amplitude = self.misfit.CC_stream(self.p_tr_obs, p_syn, self.s_tr_obs,
+                                                                          s_syn,self.P_Start,P_start)
+                        Xi_R_new = self.misfit.SW_L2(self.R_env_obs, R_env_syn, self.prior['var_est'],amplitude)
+                        Xi_L_new = self.misfit.SW_L2(self.L_env_obs, L_env_syn, self.prior['var_est'],amplitude)
+                        shift_file.write("%.4f,%.4f,%.4f,%.4f,%.4f\n" % (
+                        time_shift_new[0], time_shift_new[1], time_shift_new[2], time_shift_new[3],
+                        time_shift_new[4]))
+                        s_z_new = 0.1 * Xi_bw_new[0] #0.01
+                        s_r_new = 0.1 * Xi_bw_new[1] #0.01
+                        s_t_new = 1 * Xi_bw_new[2]  #0.1
+                        p_z_new = 5 * Xi_bw_new[3]    #5
+                        p_r_new = 5 * Xi_bw_new[4]    #5
+                        bw_new = s_z_new + s_r_new + s_t_new + p_z_new + p_r_new
+
+                        R_dict_new = {}
+                        rw_new = 0
+                        for j, v in enumerate(Xi_R_new):
+                            R_dict_new.update({'R_%i_new' % j:10*v}) # 10
+                            rw_new +=10*v
+
+
+                        L_dict_new = {}
+                        lw_new = 0
+                        for j, v in enumerate(Xi_L_new):
+                            L_dict_new.update({'L_%i_new' % j: 10*v}) # 10
+                            lw_new += 10*v
+                        Xi_new = bw_new + rw_new + lw_new
+
+                        M0 = M0_old/ np.sqrt(np.mean(amplitude))
+
 
                         if i == 0:
+                            print('Hit p + ENTR for plot!')
                             s_z_old = s_z_new
                             s_r_old = s_r_new
                             s_t_old = s_t_new
@@ -324,10 +341,11 @@ class MCMC_stream:
                             epi_old = epi
                             depth_old = depth
                             moment_old = moment
-                            self.write_sample(save_file, epi_old, depth_old, moment_old, Xi_old, s_z_old, s_r_old,
+                            M0_old = M0
+                            self.write_sample(save_file, epi_old, depth_old, moment_old, M0_old,Xi_old, s_z_old, s_r_old,
                                               s_t_old, p_z_old, p_r_old, bw_old, R_dict_old, rw_old, L_dict_old, lw_old,
                                               accept=1)
-                            self.write_sample(save_reject_file, epi_old, depth_old, moment_old, Xi_old, s_z_old,
+                            self.write_sample(save_reject_file, epi_old, depth_old, moment_old, M0_old,Xi_old, s_z_old,
                                               s_r_old, s_t_old, p_z_old, p_r_old, bw_old, R_dict_old, rw_old,
                                               L_dict_old, lw_old, accept=1)
 
@@ -347,24 +365,28 @@ class MCMC_stream:
                                 plot_L_reject += L_env_syn
                                 plot_L += L_env_syn
 
-                                self.total_tr_obs.write(self.directory + '/bw.mseed', format='MSEED')
-                                self.R_env_obs.write(self.directory + '/R.mseed', format='MSEED')
-                                self.L_env_obs.write(self.directory + '/L.mseed', format='MSEED')
-                                self.total_tr_obs.write(self.directory + '/bw_reject.mseed', format='MSEED')
-                                self.R_env_obs.write(self.directory + '/R_reject.mseed', format='MSEED')
-                                self.L_env_obs.write(self.directory + '/L_reject.mseed', format='MSEED')
-
-                                plot_bw.write(self.directory + '/bw.mseed', format='MSEED')
-                                plot_R.write(self.directory + '/R.mseed', format='MSEED')
-                                plot_L.write(self.directory + '/L.mseed', format='MSEED')
-                                plot_bw_reject.write(self.directory + '/bw_reject.mseed', format='MSEED')
-                                plot_R_reject.write(self.directory + '/R_reject.mseed', format='MSEED')
-                                plot_L_reject.write(self.directory + '/L_reject.mseed', format='MSEED')
-
                             continue
+                        # if kb.kbhit():
+                        #     c = kb.getch()
+                        #     if (ord(
+                        #             c) == 112):  # 112 staat voor p, probeer anders print(ord(c)) om te kijken welke letter het is
+                        #         print("Wait for it ...")
+                        #         plot_obs_bw = self.p_tr_obs.__add__(self.s_tr_obs)
+                        #         plot_obs_R = self.R_env_obs
+                        #         plot_obs_L = self.L_env_obs
+                        #         self.plot_streams(plot_obs_bw, plot_bw, 1)
+                        #         self.plot_streams(plot_obs_R, plot_R, 2)
+                        #         self.plot_streams(plot_obs_L, plot_L, 3)
+                        #         self.plot_streams(plot_obs_bw, plot_bw_reject, 4)
+                        #         self.plot_streams(plot_obs_R, plot_R_reject, 5)
+                        #         self.plot_streams(plot_obs_L, plot_L_reject, 6)
+                        #         print("Check your directory ^^ (PLOTS)")
+                        #
+                        # kb.set_normal_term()
 
                         random = np.random.random_sample((1,))
                         if (Xi_new < Xi_old) or (np.exp((Xi_old - Xi_new) / self.temperature) > random):
+                            print(Xi_new)
                             s_z_old = s_z_new
                             s_r_old = s_r_new
                             s_t_old = s_t_new
@@ -384,8 +406,9 @@ class MCMC_stream:
                             epi_old = epi
                             depth_old = depth
                             moment_old = moment
+                            M0_old = M0
                             accepted = accepted + 1
-                            self.write_sample(save_file, epi_old, depth_old, moment_old, Xi_old, s_z_old, s_r_old,
+                            self.write_sample(save_file, epi_old, depth_old, moment_old, M0_old,Xi_old, s_z_old, s_r_old,
                                               s_t_old, p_z_old, p_r_old, bw_old, R_dict_old, rw_old, L_dict_old, lw_old,
                                               accept=1)
                             if i % 10 == 0:
@@ -396,16 +419,13 @@ class MCMC_stream:
                                     plot_bw += plot_traces
                                     plot_R += R_env_syn
                                     plot_L += L_env_syn
-                                    plot_bw.write(self.directory + '/bw.mseed', format='MSEED')
-                                    plot_R.write(self.directory + '/R.mseed', format='MSEED')
-                                    plot_L.write(self.directory + '/L.mseed', format='MSEED')
 
 
                         else:
                             rejected += 1
-                            self.write_sample(save_file, epi, depth, moment, Xi_old, s_z_old, s_r_old, s_t_old, p_z_old,
+                            self.write_sample(save_file, epi_old, depth_old, moment_old, M0_old,Xi_old, s_z_old, s_r_old, s_t_old, p_z_old,
                                               p_r_old, bw_old, R_dict_old, rw_old, L_dict_old, lw_old, accept=0)
-                            self.write_sample(save_reject_file, epi, depth, moment, Xi_new, s_z_new, s_r_new, s_t_new,
+                            self.write_sample(save_reject_file, epi, depth, moment,M0, Xi_new, s_z_new, s_r_new, s_t_new,
                                               p_z_new, p_r_new, bw_new, R_dict_new, rw_new, L_dict_new, lw_new,
                                               accept=0)
                             if i % 10 == 0:
@@ -415,9 +435,7 @@ class MCMC_stream:
                                     plot_bw_reject += plot_traces
                                     plot_R_reject += R_env_syn
                                     plot_L_reject += L_env_syn
-                                    plot_bw_reject.write(self.directory + '/bw_reject.mseed', format='MSEED')
-                                    plot_R_reject.write(self.directory + '/R_reject.mseed', format='MSEED')
-                                    plot_L_reject.write(self.directory + '/L_reject.mseed', format='MSEED')
+
 
                     if self.plot_modus == True:
                         plot_obs_bw = self.p_tr_obs.__add__(self.s_tr_obs)
@@ -430,20 +448,12 @@ class MCMC_stream:
                         self.plot_streams(plot_obs_R, plot_R_reject, 5)
                         self.plot_streams(plot_obs_L, plot_L_reject, 6)
 
-                        # self.plot(1, plot_obs, label="bw", iter="final", accepted=True)
-                        # self.plot(2, self.R_env_obs, label="R", iter="final", accepted=True)
-                        # self.plot(3, self.L_env_obs, label="L", iter="final", accepted=True)
-                        #
-                        # self.plot(4, plot_obs, label="bw", iter="final", accepted=False)
-                        # self.plot(5, self.R_env_obs, label="R", iter="final", accepted=False)
-                        # self.plot(6, self.L_env_obs, label="L", iter="final", accepted=False)
-
                 save_file.close()
             save_reject_file.close()
         shift_file.close
 
     def plot_streams(self, obs_stream, syn_stream, fig_num):
-        label, save_name = self.get_label(fig_num, len(obs_stream))
+        label, save_name,x_min,x_max = self.get_label(fig_num, len(obs_stream))
         plt.figure(fig_num)
         length = len(syn_stream) / len(obs_stream)
         for k in range(length):
@@ -453,15 +463,26 @@ class MCMC_stream:
                 subplot_no = len(obs_stream) * 100 + 10 + iter + 1
                 plt.subplot(subplot_no)
                 if k == 0:
-                    plt.plot(self.zero_to_nan(syn_stream.traces[p].data), linewidth=0.3,
-                             label="start_sample:%s" % label[j], linestyle=":", c='r')
+                    if fig_num == 1 or fig_num == 4:
+                        plt.plot(self.zero_to_nan(syn_stream.traces[p].data[x_min[j]:x_max[j]]), linewidth=0.7,
+                                 label="start_sample:%s" % label[j], linestyle=":", c='r')
+                    else:
+                        plt.plot(self.zero_to_nan(syn_stream.traces[p].data), linewidth=0.7,
+                                 label="start_sample:%s" % label[j], linestyle=":", c='r')
                 elif k == length - 1:
-                    plt.plot(self.zero_to_nan(obs_stream.traces[j].data), alpha=0.5, linewidth=0.3,
-                             label="obs_sample:%s" % label[j], c='k')
+                    if fig_num == 1 or fig_num == 4:
+                        plt.plot(self.zero_to_nan(obs_stream.traces[j].data[x_min[j]:x_max[j]]),  linewidth=0.7,
+                                 label="obs_sample:%s" % label[j], c='k')
+                    else:
+                        plt.plot(self.zero_to_nan(obs_stream.traces[j].data),  linewidth=0.7,
+                                 label="obs_sample:%s" % label[j], c='k')
                     plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=3, ncol=2, mode="expand", borderaxespad=0.)
                     plt.tight_layout()
                 else:
-                    plt.plot(self.zero_to_nan(syn_stream.traces[p].data),  linewidth=0.3, c='k')
+                    if fig_num == 1 or fig_num == 4:
+                        plt.plot(self.zero_to_nan(syn_stream.traces[p].data[x_min[j]:x_max[j]]), alpha = 0.2, linewidth=0.3, c='b')
+                    else:
+                        plt.plot(self.zero_to_nan(syn_stream.traces[p].data), alpha=0.2,linewidth=0.3, c='b')
                 iter += 1
         plt.savefig(self.directory + save_name)
         plt.close()
@@ -470,30 +491,50 @@ class MCMC_stream:
         if fig_num == 1:
             label = np.array(["P_z", "P_r", "S_z", "S_r", "S_t"])
             save_name = '/Accepted_bw.pdf'
+            x_min = np.array([0,0,500,500,500])
+            x_max = np.array([60,60,700,700,700])
         elif fig_num == 2:
             label = np.array([])
+            x_min = np.array([])
+            x_max = np.array([])
             for i in range(len_obs_stream):
                 label = np.append(label, "R_%i" % i)
+                x_min = np.append(x_min,0)
+                x_max = np.append(x_max,None)
             save_name = '/Accepted_R.pdf'
         elif fig_num == 3:
             label = np.array([])
+            x_min = np.array([])
+            x_max = np.array([])
             for i in range(len_obs_stream):
                 label = np.append(label, "L_%i" % i)
+                x_min = np.append(x_min, 0)
+                x_max = np.append(x_max, None)
             save_name = '/Accepted_L.pdf'
         elif fig_num == 4:
             label = np.array(["P_z", "P_r", "S_z", "S_r", "S_t"])
             save_name = '/Rejected_bw.pdf'
+            x_min = np.array([0,0,500,500,500])
+            x_max = np.array([100,100,700,700,700])
         elif fig_num == 5:
             label = np.array([])
+            x_min = np.array([])
+            x_max = np.array([])
             for i in range(len_obs_stream):
                 label = np.append(label, "R_%i" % i)
+                x_min = np.append(x_min, int(0))
+                x_max = np.append(x_max, None)
             save_name = '/Rejected_R.pdf'
         elif fig_num == 6:
             label = np.array([])
+            x_min = np.array([])
+            x_max = np.array([])
             for i in range(len_obs_stream):
                 label = np.append(label, "L_%i" % i)
+                x_min = np.append(x_min, 0)
+                x_max = np.append(x_max, None)
             save_name = '/Rejected_L.pdf'
-        return label, save_name
+        return label, save_name ,x_min,x_max
 
     def plot(self, figure_number, stream_to_plot, label, iter, accepted=True):
         # -- Label -- [String]
@@ -548,7 +589,7 @@ class MCMC_stream:
         txt_file.write("sdr:%r\n\r" % self.sdr)
         txt_file.write("plot_modus:%r\n\r" % self.plot_modus)
         # txt_file.write("%.4f\n\r" % self.par['MO'])  #
-        txt_file.write("alpha:%.4f\n\r" % self.prior['alpha'])  #
+        txt_file.write("blindtest:%r\n\r" % self.blind)  #
         txt_file.write("beta:%.4f\n\r" % self.prior['beta'])  #
         txt_file.write("azimuth:%.4f\n\r" % self.prior['az'])  #
         txt_file.write(
@@ -580,10 +621,10 @@ class MCMC_stream:
             self.time_at_rec.year, self.time_at_rec.month, self.time_at_rec.day,
             self.time_at_rec.hour, self.time_at_rec.minute, self.time_at_rec.second))  #
 
-    def write_sample(self, file_name, epi, depth, moment, Xi_old, s_z_old, s_r_old, s_t_old, p_z_old, p_r_old, bw_old,
+    def write_sample(self, file_name, epi, depth, moment,M0 ,Xi_old, s_z_old, s_r_old, s_t_old, p_z_old, p_r_old, bw_old,
                      R_dict, rw_old, L_dict, lw_old, accept=0):
-        file_name.write("%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f," % (
-            epi, depth, moment[0], moment[1], moment[2], Xi_old, s_z_old, s_r_old, s_t_old, p_z_old, p_r_old, bw_old,
+        file_name.write("%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f," % (
+            epi, depth, moment[0], moment[1], moment[2], M0,Xi_old, s_z_old, s_r_old, s_t_old, p_z_old, p_r_old, bw_old,
             rw_old, lw_old))
         for j, v in R_dict.iteritems():
             file_name.write("%.4f," % v)

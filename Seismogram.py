@@ -13,13 +13,13 @@ class Seismogram:
         return receiver
 
     def get_source(self, la_s, lo_s, depth, strike=None, dip=None, rake=None, m_tp=None, m_rp=None, m_rt=None,
-                   m_pp=None, m_tt=None, m_rr=None, time=None, sdr=False):
+                   m_pp=None, m_tt=None, m_rr=None, time=None,M0=None, sdr=False):
         if sdr == True:
             source = instaseis.Source.from_strike_dip_rake(latitude=la_s, longitude=lo_s,
                                                            depth_in_m=depth,
                                                            strike=strike, dip=dip,
-                                                           rake=rake, M0=self.prior['M0'],
-                                                           origin_time=time,dt=2.0)
+                                                           rake=rake, M0=M0,
+                                                           origin_time=time,dt = 2.0)
             return source
         else:
             source = instaseis.Source(latitude=la_s, longitude=lo_s,
@@ -28,8 +28,8 @@ class Seismogram:
                                            m_rr=m_rr, origin_time=time)
             return source
 
-    def get_seis_manual(self, la_s, lo_s, depth, strike, dip,   rake, time, sdr):
-        source = self.get_source(la_s=la_s, lo_s=lo_s, depth=depth, strike=strike, dip=dip,rake= rake, time= time, sdr=sdr)
+    def get_seis_manual(self, la_s, lo_s, depth, strike, dip, rake, time, M0,sdr):
+        source = self.get_source(la_s=la_s, lo_s=lo_s, depth=depth, strike=strike, dip=dip,rake= rake, time= time,M0=M0, sdr=sdr)
         receiver = self.get_receiver()
         traces = self.db.get_seismograms(source=source, receiver=receiver, components=self.prior['components'],
                                          kind=self.prior['kind'])

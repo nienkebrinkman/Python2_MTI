@@ -6,6 +6,7 @@ import numpy as np
 from obspy.core.stream import Stream
 from obspy.core.trace import Trace
 import matplotlib.pylab as plt
+from obspy.signal.filter import envelope
 
 class Create_observed:
     def __init__(self, PRIOR, db):
@@ -74,13 +75,10 @@ class Create_observed:
 
         return tt[0].time
 
-    def get_receiver_time(self, epi, depth,origin_time):
+    def get_receiver_time(self, epi, depth, origin_time):
         tt_P = self.get_P(epi, depth)  # Estimated P-wave arrival, based on the known velocity model
-        tt_window = tt_P -10
+        tt_window = tt_P -5
         time_at_receiver = obspy.UTCDateTime(origin_time.timestamp + tt_window)
-        # TODO plot the reference time on the actual d_obs
-        # plt.plot(d_obs_traces[0])
-        # plt.plot()
         return time_at_receiver
 
     def time_between_windows(self,epi,depth,dt):
@@ -101,14 +99,15 @@ class Create_observed:
         total_stream = Stream()
         s_stream=Stream()
         p_stream=Stream()
-        for i, trace in enumerate(seis_traces.traces):
-            p_time = or_time.timestamp + tt_P
-            s_time=or_time.timestamp+tt_S
-            start_time_p = obspy.UTCDateTime(p_time - 5) # -10 , + 44.2 --> PAPER: STAHLER & SIGLOCH
-            end_time_p = obspy.UTCDateTime(p_time + 20)
-            start_time_s = obspy.UTCDateTime(s_time - 5)
-            end_time_s = obspy.UTCDateTime(s_time + 20)
 
+        p_time = or_time.timestamp + tt_P
+        s_time = or_time.timestamp + tt_S
+        start_time_p = obspy.UTCDateTime(p_time - 5)  # -10 , + 44.2 --> PAPER: STAHLER & SIGLOCH
+        end_time_p = obspy.UTCDateTime(p_time + 20)
+        start_time_s = obspy.UTCDateTime(s_time - 15)
+        end_time_s = obspy.UTCDateTime(s_time + 35)
+
+        for i, trace in enumerate(seis_traces.traces):
             P_trace = Trace.slice(trace, start_time_p, end_time_p)
             # P_trace.detrend(type='demean')
             S_trace = Trace.slice(trace, start_time_s, end_time_s)
@@ -129,8 +128,14 @@ class Create_observed:
                 p_stream.append(total_p_trace)
             s_stream.append(total_s_trace)
             total_stream.append(total_trace)
-            # TODO Get the Rayleigh and Love windows also!!
-        return total_stream,p_stream,s_stream
+            s_stream = self.BW_filter(s_stream)
+            p_stream = self.BW_filter(p_stream)
+            total_stream = self.BW_filter(total_stream)
+        return total_stream,p_stream,s_stream,start_time_p,start_time_s
+    def BW_filter(self,stream):
+        stream.filter('highpass',freq=1.0/30.0)
+        stream.filter('lowpass',freq=0.75)
+        return stream
 
     def get_fft(self, traces, directory):
 
@@ -151,6 +156,21 @@ class Create_observed:
             plt.savefig(directory + '/fft_channel_%s' %trace.stats.channel)
             plt.close()
             print("The fft graphs are saved in: %s" %directory)
+            # dominant_freq = freq[np.argmax(fft[int(0.1*len(fft)):-int(0.1*len(fft))])]
+            # return  dominant_freq
+
+    def get_var_data(self,P_start_time,full_obs_stream):
+        max_amp = 0
+        noise_est = full_obs_stream.copy()
+        for trace in noise_est:
+            env = envelope(trace.data)
+            trace.data = env
+            trace.trim(starttime=trace.meta.starttime,endtime=P_start_time)
+            max_amp += max(trace.data)
+        return max_amp/(len(noise_est)*2)
+
+
+
 
 
 

@@ -14,6 +14,7 @@ from obspy.core.stream import Stream
 from obspy.core.trace import Trace
 import matplotlib.pylab as plt
 
+
 class Blindtest:
     def get_events(self,filepath_catalog):
         catalog = obspy.read_events(filepath_catalog)
@@ -41,6 +42,9 @@ class Blindtest:
     def Magnitude2Scalarmoment(self,Mw):
         M=10**(9.1 + Mw *(3.0/2.0))
         return M
+    def Scalarmoment2Magnitude(self,M0):
+        Mw = 2.0 / 3.0 * (np.log10(M0) - 9.1)
+        return Mw
 
     def pick_sw(self,stream,pick_info,epi,prior,npts, directory,plot_modus=False):
         if plot_modus == True:
@@ -86,9 +90,10 @@ class Blindtest:
                     plt.savefig(dir_phases + '/sw_with_Rayleigh_windows.pdf')
                     # plt.show()
                     plt.close()
-                Z_trace.trim(starttime=pick['time']-pick['lower_uncertainty'], endtime=pick['time']+pick['lower_uncertainty'])
+                Period = 1.0 /pick['frequency']
+                Z_trace.trim(starttime=pick['time']-Period, endtime=pick['time']+Period)
                 zero_trace = Trace(np.zeros(npts),
-                                   header={"starttime":pick['time']-pick['lower_uncertainty'] , 'delta': Z_trace.meta.delta,
+                                   header={"starttime":pick['time']-Period , 'delta': Z_trace.meta.delta,
                                            "station": Z_trace.meta.station,
                                            "network": Z_trace.meta.network, "location": Z_trace.meta.location,
                                            "channel": Z_trace.meta.channel})
@@ -135,10 +140,10 @@ class Blindtest:
                     plt.savefig(dir_phases + '/sw_with_Love_windows.pdf')
                     # plt.show()
                     plt.close()
-                T_trace.trim(starttime=pick['time'] - pick['lower_uncertainty'],
-                             endtime=pick['time'] + pick['lower_uncertainty'])
+                Period = 1.0 /pick['frequency']
+                T_trace.trim(starttime=pick['time']-Period, endtime=pick['time']+Period)
                 zero_trace = Trace(np.zeros(npts),
-                                   header={"starttime":pick['time']-pick['lower_uncertainty'] , 'delta': T_trace.meta.delta,
+                                   header={"starttime":pick['time']-Period , 'delta': T_trace.meta.delta,
                                            "station": T_trace.meta.station,
                                            "network": T_trace.meta.network, "location": T_trace.meta.location,
                                            "channel": T_trace.meta.channel})
@@ -154,3 +159,4 @@ class Blindtest:
                     plt.savefig(dir_phases + '/diff_Love_freq.pdf')
                     plt.close()
         return Rayleigh_st,Love_st
+

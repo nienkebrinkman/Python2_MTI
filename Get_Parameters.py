@@ -6,6 +6,8 @@ import numpy as np
 from obspy.geodetics import kilometer2degrees
 from obspy.geodetics.base import gps2dist_azimuth
 
+from Blindtest import Blindtest
+
 class Get_Paramters:
     def specifications(self):
         ## Returns: Dict {}
@@ -25,12 +27,14 @@ class Get_Paramters:
 
         # Construct the observed data:
         sdr = True # If True: invert Strike/Dip/Rake, If False: invert m_tt,m_pp,m_rr,m_tp,m_rt,m_rp
-        noise = False
+        noise = True
         plot_modus = True # If True: you make seismogram plots during your MCMC algorithm
         temperature = 1
         directory = '/home/nienke/Documents/Applied_geophysics/Thesis/anaconda/Final'
         npts = 2000 # The amount of samples of your seismogram
 
+        # Blind test Options:
+        blind = True
 
         SPEC={
             'sdr':sdr,
@@ -41,7 +45,8 @@ class Get_Paramters:
             'temperature':temperature,
             'directory':directory,
             'npts': npts,
-            'rnd_par':rnd_par}
+            'rnd_par':rnd_par,
+            'blind':blind}
         return SPEC
 
 
@@ -92,7 +97,7 @@ class Get_Paramters:
         PRIOR['station'] = "SYNT1"  # Station
 
         # -Source
-        PRIOR['M0'] = 1E16
+        PRIOR['M0'] = 1E16 #Mw = 4.6
         PRIOR['components'] = ["Z", "R", "T"]
 
         # -filter
@@ -125,8 +130,8 @@ class Get_Paramters:
         PRIOR['dip']['range_max'] = 89.9
         PRIOR['angle_spread'] = 5
         PRIOR['rake']['range_min'] = -180
-        PRIOR['rake']['range_max'] = 179
-        PRIOR['rake']['spread'] = 1
+        PRIOR['rake']['range_max'] = 179.9
+        PRIOR['rake']['spread'] = 5
 
         PRIOR['depth']['range_min'] = 0
         PRIOR['depth']['range_max'] = 50000
@@ -135,9 +140,10 @@ class Get_Paramters:
         PRIOR['epi']['range_max'] = estimated_epi + 5
         PRIOR['epi']['spread'] = 1
 
-        PRIOR['sample_number'] = 100
-        PRIOR['var_est'] = 0.5
+        PRIOR['sample_number'] = 1000
+
         return PRIOR
+
 
     def get_unkown(self):
         ## returns Dict {}
